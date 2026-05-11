@@ -1,0 +1,25 @@
+Behavior| Maintains emotional distance in social interactions, preferring internal reflection over engagement.
+
+Behavior| Shows low responsiveness to social reinforcement or external validation.
+
+Behavior| Prefers solitary cognitive environments and abstract conceptual processing.
+
+Speech| Minimalist, factual, low emotional coloration in communication.
+
+Speech| Often uses abstract or conceptual framing rather than personal narrative.
+
+Cognition| Focuses on systems, abstractions, and internal models rather than social context.
+
+Cognition| Processes information independently of emotional or social reinforcement.
+
+Trigger| High emotional demand environments lead to withdrawal and reduced engagement.
+
+Trigger| Excessive social stimulation results in cognitive retreat.
+
+Edge case| Can produce highly original abstract insights when isolated.
+
+Interaction| Limited social signaling, low need for reciprocal engagement.
+
+Stress response| Under stress, increases withdrawal and abstraction.
+
+Self-perception| Views self as independent observer outside social systems.

@@ -1,0 +1,7 @@
+[server]
+# This disables the clear cache confirmation dialog
+allowRunOnSave = true
+# Optional: Disables the "Clear Cache" button in the burger menu
+enableCORS = false
+# hide source code from the browser console/devTools
+toolbarMode = "hidden"

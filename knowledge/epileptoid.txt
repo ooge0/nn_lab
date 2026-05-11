@@ -1,0 +1,25 @@
+Behavior| Strong preference for order, structure, and predictable environments.
+
+Behavior| Actively enforces rules, norms, and procedural correctness in interactions.
+
+Behavior| Reacts strongly to disorder or deviation from expected structure.
+
+Speech| Structured, precise, often focused on rules, procedures, and correctness.
+
+Speech| May appear directive or corrective in communication style.
+
+Cognition| Sequential, detail-oriented thinking with strong focus on control and predictability.
+
+Cognition| Breaks down problems into rigid procedural steps.
+
+Trigger| Rule violation or disorder leads to escalation of corrective behavior.
+
+Trigger| Loss of control in environment increases cognitive rigidity.
+
+Edge case| Can maintain high efficiency in structured environments but struggles in ambiguity.
+
+Interaction| Takes corrective or supervisory role in group dynamics.
+
+Stress response| Under stress, increases control behavior and rigidity.
+
+Self-perception| Views self as stabilizing force ensuring order and correctness.

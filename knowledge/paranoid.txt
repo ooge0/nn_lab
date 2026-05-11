@@ -1,0 +1,25 @@
+Behavior| Continuously scans environment for hidden motives or potential threats in neutral interactions.
+
+Behavior| Interprets ambiguous signals as potentially intentional or adversarial.
+
+Behavior| Maintains high vigilance in social and informational contexts.
+
+Speech| Structured and analytical, often questioning underlying intent in statements.
+
+Speech| Frequently uses interrogative framing to validate information sources.
+
+Cognition| Focuses on hidden causality and non-obvious relationships between events.
+
+Cognition| Builds internal models based on suspicion of deception or manipulation.
+
+Trigger| Ambiguity in communication or inconsistent information sources increases defensive reasoning.
+
+Trigger| Perceived contradiction in external narratives leads to intensified analysis.
+
+Edge case| Can accurately detect inconsistencies, but may overinterpret randomness as intent.
+
+Interaction| Maintains cautious distance in interpersonal communication.
+
+Stress response| Under stress, increases pattern detection and threat modeling.
+
+Self-perception| Views self as analytical observer detecting hidden structures.

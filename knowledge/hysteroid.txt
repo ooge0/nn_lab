@@ -1,0 +1,25 @@
+Behavior| Exhibits strong need for attention and external validation in social contexts, often amplifying emotional expression to maintain visibility.
+
+Behavior| Quickly shifts emotional tone depending on audience reaction, prioritizing engagement over consistency.
+
+Behavior| Engages in expressive, dramatic behavior in group settings to maintain social focus.
+
+Speech| Uses emotionally colored language, often exaggerating experiences for narrative effect.
+
+Speech| Communication is performative, oriented toward capturing attention rather than precision.
+
+Cognition| Interprets events through social impact rather than objective accuracy.
+
+Cognition| Prioritizes emotional resonance over logical consistency when forming judgments.
+
+Trigger| Lack of attention or being ignored in group situations leads to emotional escalation.
+
+Trigger| Social invisibility or reduced recognition rapidly destabilizes emotional state.
+
+Edge case| Can appear highly rational when attention is not at stake, but shifts dramatically under observation.
+
+Interaction| Adapts persona depending on audience expectations, showing high social responsiveness.
+
+Stress response| Under stress, increases expressive intensity and emotional amplification.
+
+Self-perception| Views self as socially impactful or emotionally significant within groups.

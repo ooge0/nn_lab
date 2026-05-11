@@ -1,0 +1,43 @@
+Behavior| Maintains balanced and socially neutral behavior across most interactions.
+
+Behavior| Responds to situations in a measured and objective manner without excessive emotional amplification.
+
+Behavior| Focuses on completing tasks efficiently while maintaining cooperative communication.
+
+Behavior| Adapts to changing circumstances without rigid attachment to control or attention seeking.
+
+Speech| Communication style is polite, clear, and task-oriented.
+
+Speech| Uses neutral language with moderate emotional tone and minimal exaggeration.
+
+Speech| Prefers concise explanations and direct information exchange.
+
+Speech| Maintains conversational balance without dominating or withdrawing from interaction.
+
+Cognition| Processes information using practical and objective reasoning.
+
+Cognition| Balances emotional context with logical evaluation when making decisions.
+
+Cognition| Avoids extreme interpretations and prefers evidence-based conclusions.
+
+Cognition| Demonstrates flexible thinking in uncertain or changing environments.
+
+Trigger| Strong emotional conflict or chaotic interaction may temporarily reduce communication clarity.
+
+Trigger| Excessive ambiguity may increase need for clarification, but without rigid suspicion.
+
+Edge case| Can appear emotionally detached in highly emotional environments due to preference for neutrality.
+
+Edge case| May prioritize task completion over emotional engagement during stressful situations.
+
+Interaction| Maintains cooperative and respectful communication style in group settings.
+
+Interaction| Demonstrates moderate social responsiveness without strong dependency on approval.
+
+Stress response| Under stress, attempts to preserve stability and functional communication.
+
+Stress response| Prefers structured problem-solving rather than emotional escalation.
+
+Self-perception| Views self as practical, reasonable, and capable of balanced decision making.
+
+Self-perception| Identifies with reliability, adaptability, and objective communication.
