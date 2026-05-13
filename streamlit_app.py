@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import subprocess
 import sys
 import time
 import traceback
@@ -20,7 +21,7 @@ from tmp.simple_plotty_staff import get_high_dim_dashboard
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.append(current_dir)
-from core.calculate_advanced_linguistic_metrics import calculate_advanced_linguistic_metrics
+from core.analysis.calculate_advanced_linguistic_metrics import calculate_advanced_linguistic_metrics
 from core.analysis.nlp_science import PsychScientist
 from core.neuro_metrics import NeuroMetrics
 from core.data_contract import LabDataBridge
@@ -28,6 +29,7 @@ from core.cluster_discovery import ClusterDiscovery
 import hdbscan
 import numpy as np
 from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
 
 logging.getLogger("transformers").setLevel(logging.ERROR)
 
@@ -38,17 +40,6 @@ warnings.filterwarnings('ignore', message='.*n_jobs value 1 overridden.*')
 
 
 # --- 0.Auto-download required resources if missing ---
-
-
-def ensure_ollama_run():
-    """Checks if the Ollama service is reachable."""
-    try:
-        ollama.list()
-        return True
-    except Exception as e:
-        logger.error(f"Ollama connection failed: {e}")
-        return False
-
 
 @st.cache_resource
 def ensure_nltk_resources():
@@ -76,7 +67,9 @@ def ensure_nltk_resources():
 
 ensure_nltk_resources()
 
-# --- 1. CONFIG & DIRECTORIES ---
+# ============================================================
+#   CONFIG & DIRECTORIES
+# ============================================================
 RESULTS_DIR = "results"
 LOGS_DIR = "logs"
 os.makedirs(LOGS_DIR, exist_ok=True)
@@ -87,7 +80,9 @@ logger.remove()
 logger.add(LOG_FILE, rotation="10 MB", retention="10 days", level="INFO",
            format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
 
-# --- 2. PAGE CONFIG ---
+# ============================================================
+#  PAGE CONFIG
+# ============================================================
 st.set_page_config(page_title="Psych Data Lab Pro", layout="wide", page_icon="🧠")
 
 st.markdown("""
@@ -103,11 +98,34 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. SESSION STATE ---
+
+# ============================================================
+# CLIENT
+# ============================================================
+def ensure_ollama_run():
+    """Checks if the Ollama service is reachable."""
+    try:
+        ollama.list()
+        return True
+    except Exception as e:
+        logger.error(f"Ollama connection failed: {e}")
+        return False
+
+
+client = OpenAI(
+    base_url="http://localhost:11434/v1",
+    api_key="ollama"
+)
+
+# ============================================================
+# SESSION STATE
+# ============================================================
+
 if "history" not in st.session_state: st.session_state.history = []
 if "log_entries" not in st.session_state: st.session_state.log_entries = []
 if "stop_requested" not in st.session_state: st.session_state.stop_requested = False
 if "current_progress" not in st.session_state: st.session_state.current_progress = 0
+if "steps" not in st.session_state: st.session_state.steps = 0
 if "total_tasks" not in st.session_state: st.session_state.total_tasks = 0
 if "is_running" not in st.session_state: st.session_state.is_running = False
 if "last_run_summary" not in st.session_state: st.session_state.last_run_summary = ""
@@ -116,7 +134,15 @@ if "auto_expanded" not in st.session_state:
 if "exp_expanded" not in st.session_state:
     st.session_state.exp_expanded = True
 
-client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
+# Pull State (related to the uploading models via ollama API
+if "pull_process" not in st.session_state:
+    st.session_state.pull_process = None
+
+if "pull_logs" not in st.session_state:
+    st.session_state.pull_logs = []
+
+if "pull_running" not in st.session_state:
+    st.session_state.pull_running = False
 
 PSYCHOTYPES = {
     "Baseline": "Balanced, polite, task-oriented, and objective communication without emotional or structural extremes.",
@@ -127,6 +153,9 @@ PSYCHOTYPES = {
 }
 
 
+# ============================================================
+# UTILS
+# ============================================================
 def trigger_stop():
     st.session_state.is_running = False
     st.session_state.stop_requested = False
@@ -144,6 +173,27 @@ def render_console():
     return f'<div class="terminal-container">{"".join([f"<div class=\"terminal-line\">{e}</div>" for e in reversed(st.session_state.log_entries)])}</div>'
 
 
+def stream_pull_output(process):
+    """
+    Reads ollama pull stdout in real time.
+    """
+    while True:
+        line = process.stdout.readline()
+
+        if not line:
+            break
+
+        clean = line.strip()
+
+        if clean:
+            st.session_state.pull_logs.append(clean)
+
+    process.stdout.close()
+
+
+# ============================================================
+# SIDEBAR
+# ============================================================
 # --- 5. SIDEBAR ---
 if "open_debug" not in st.session_state:
     st.session_state["open_debug"] = False  # Default to open
@@ -151,7 +201,9 @@ if st.sidebar.button("Toggle 'Debug' + 'Lab'"):
     st.session_state["open_debug"] = not st.session_state["open_debug"]
     st.rerun()
 
-# --- DEBUG MODES CONFIGURATION ---
+# ============================================================
+# SIDEBAR. DEBUG MODES CONFIGURATION
+# ============================================================
 st.sidebar.title("🧪 Debug preset")
 
 with st.sidebar.expander("📊 Modes and statuses", expanded=st.session_state["open_debug"]):
@@ -204,6 +256,9 @@ with st.sidebar.expander("📊 Modes and statuses", expanded=st.session_state["o
         st.toast("Applied Teacher-Student Debug Config")
         st.rerun()
 
+# ============================================================
+#
+# ============================================================
 st.sidebar.title("🧪 Lab Controls")
 with st.sidebar.expander("📊 Baseline Parameters", expanded=st.session_state["open_debug"]):
     base_temp = st.slider("Temperature", 0.0, 2.0, 0.3, 0.1)
@@ -254,23 +309,64 @@ with st.sidebar.expander(" 📂 Data", expanded=False):
             except Exception as e:
                 st.error(str(e))
 
-# --- 6. MAIN INTERFACE ---
-tab_gen, tab_perf, tab_insights, tab_nlp, tab_clusters, tab_benchmark, tab_monitor, tab_debug, tab_faq = st.tabs(
-    ["🚀 Generation", "📊 Performance", "📈 Analytics", "🧪 NLP Science", "Clustering", "📑 Benchmark", "🖥️ Monitor",
-     "Debug", "❓ FAQ"]
-)
+# ============================================================
+#  MAIN INTERFACE
+# ============================================================
+# 1- 🚀 Generation
+# 2- 📊 Performance
+# 3- 📈 Analytics
+# 4- 🧪 NLP Science
+# 5- 🧩 Clustering
+# 6- 🧬 Model Evaluation
+# 7- 📑 Benchmark
+# 8- 🖥️ Monitor
+# 9- 🛠️ Debug << depends on the SHOW_DEBUG_TAB flag
+# 10- ❓ FAQ
+
+SHOW_DEBUG_TAB = False
+
+tab_labels = [
+    "🚀 Generation",
+    "📊 Performance",
+    "📈 Analytics",
+    "🧪 NLP Science",
+    "🧩 Clustering",
+    "🧬 Model Evaluation",
+    "📑 Benchmark",
+    "🖥️ Monitor",
+]
+
+if SHOW_DEBUG_TAB:
+    tab_labels.append("🛠️ Debug")
+
+tab_labels.append("❓ FAQ")
+
+tabs = st.tabs(tab_labels)
+
+tab_gen = tabs[0]
+tab_perf = tabs[1]
+tab_analytics = tabs[2]
+tab_nlp = tabs[3]
+tab_clusters = tabs[4]
+tab_model_evo = tabs[5]
+tab_benchmark = tabs[6]
+tab_monitor = tabs[7]
+
+tab_debug = None
+
+if SHOW_DEBUG_TAB:
+    tab_debug = tabs[8]
+    tab_faq = tabs[9]
+else:
+    tab_faq = tabs[8]
+
 df = None
 
-if "history" in st.session_state and st.session_state.history:
-    df = pd.json_normalize(st.session_state.history)
-else:
-    st.info("Run automation to populate the 8 metric analytics.")
-
-# ============================================================
-# TAB: GENERATION
-# Full RAG-enabled Generation Pipeline
-# ============================================================
-
+# if "history" in st.session_state and st.session_state.history:
+#     df = pd.json_normalize(st.session_state.history)
+# else:
+#     st.info("Run automation to populate the metric analytics.")
+df = pd.json_normalize(st.session_state.history) if st.session_state.history else pd.DataFrame()
 
 # ============================================================
 # SESSION STATE INIT
@@ -389,25 +485,18 @@ base_max_tokens = 300
 seed = 42
 
 # ============================================================
-# CLIENT
+#        -=-=-=-=-=-=-=-= UI -=-=-=-=-=-=-=-=
 # ============================================================
 
-from openai import OpenAI
-
-client = OpenAI(
-    base_url="http://localhost:11434/v1",
-    api_key="ollama"
-)
-
 # ============================================================
-# TAB UI
+# TAB: GENERATION
+# Full RAG-enabled Generation Pipeline
 # ============================================================
 
 with tab_gen:
     # ========================================================
     # LOAD MODELS
     # ========================================================
-
     try:
         m_names = [m.model for m in ollama.list().models]
 
@@ -504,14 +593,14 @@ with tab_gen:
         elif not rag_enabled:
             st.session_state.rag_loaded = False
             st.session_state.rag_engine = None
-
+        st.divider()
         # ====================================================
         # PARAM SWEEP
         # ====================================================
-
-        current_sweep = st.radio("Active Sweep Parameter",
+        st.subheader("Active sweep parameters")
+        current_sweep = st.radio("Sweep Parameter",
                                  ["None", "Temperature", "Top P", "Freq Penalty", "Presence Penalty"], horizontal=True,
-                                 key="current_sweep")
+                                 key="current_sweep", label_visibility="collapsed")
 
         # Create weighted columns with a small gap
         r = st.columns([0.6, 0.7, 0.5, 0.4, 0.4, 0.8], gap="small")
@@ -921,21 +1010,16 @@ with tab_gen:
                             # --------------------------------
 
                             params = {
-                                "temperature":
-                                    v_val
-                                    if current_sweep == "Temperature"
-                                    else base_temp,
-
-                                "top_p":
-                                    v_val
-                                    if current_sweep == "Top P"
-                                    else base_top_p,
-
-                                "max_tokens":
-                                    base_max_tokens,
-
-                                "seed":
-                                    seed
+                                "temperature": v_val if current_sweep == "Temperature"
+                                else base_temp,
+                                "top_p": v_val if current_sweep == "Top P"
+                                else base_top_p,
+                                "frequency_penalty": v_val if current_sweep == "Freq Penalty"
+                                else base_freq,
+                                "presence_penalty": v_val if current_sweep == "Presence Penalty"
+                                else base_pres,
+                                "max_tokens": base_max_tokens,
+                                "seed": seed
                             }
 
                             try:
@@ -1130,11 +1214,12 @@ Generate response using retrieved psychotype information.
                                 # FINAL ENTRY
                                 # =================================
 
-                                # =================================
+                                st.session_state.steps += 1
                                 entry = {
 
                                     "batch": time.strftime("%Y-%m-%d %H:%M:%S"),
                                     "total_tasks": st.session_state.total_tasks,
+                                    "steps": st.session_state.steps,
                                     "step":
                                         (
                                             f"{st.session_state.current_progress}/"
@@ -1142,11 +1227,12 @@ Generate response using retrieved psychotype information.
                                         ),
                                     "strategy": prompt_strategy,
                                     "psychotype": current_type,
+                                    "split_bias_mode": bool(st.session_state.get("split_biases", False)),
                                     "bias": b_item,
                                     "system_prompt": iter_sys_prompt,
                                     "student": student,
                                     "teacher": judge,
-                                    "output": clean_text,
+                                    "sweet_param": current_sweep,
                                     "v_ok": v_ok,
                                     "v_ok_numeric": int(v_ok),
                                     "val": v_val,
@@ -1222,14 +1308,104 @@ Generate response using retrieved psychotype information.
 
             st.rerun()
 
-# --- 2. Performance TAB---
+# ============================================================
+# Performance TAB (HIDDEN)
+# ============================================================
 with tab_perf:
-    if st.session_state.history:
-        st.dataframe(df, width='stretch')
-        # st.dataframe(pd.json_normalize(st.session_state.history), width='stretch')
+    st.subheader("📊 Performance Summary")
+    if df is None or df.empty:
+        st.info("No experiment data found. Run a generation first or upload data set.")
+    else:
+        # --- 1. Calculate General Metrics ---
+        total_records = len(df)
 
-# --- 3. Analytics & Heatmap TAB ---
-with tab_insights:
+        # Determine Sweep Info (using 'sweet_param' and 'val' from your JSONL)
+        sweep_name = df['sweet_param'].iloc[0] if 'sweet_param' in df.columns else "N/A"
+        if 'val' in df.columns:
+            val_min = df['val'].min()
+            val_max = df['val'].max()
+            sweep_range = f"{val_min} — {val_max}"
+        else:
+            sweep_range = "N/A"
+
+        # Calculate Duration (using the 'batch' timestamp as a proxy or sum of durations)
+        # If 'batch' is your start time, we take the difference between last and first
+        try:
+            df['batch_dt'] = pd.to_datetime(df['batch'])
+            start_time = df['batch_dt'].min()
+            end_time = df['batch_dt'].max()
+            # If all have the same batch timestamp, we sum the actual processing durations
+            total_duration_sec = df['duration_ms'].sum() / 1000
+            duration_str = f"{total_duration_sec / 60:.2f} min"
+        except:
+            duration_str = "Unknown"
+        # --- Calculate Remaining Metadata for summary_data ---
+
+        # 1. Basic Stats
+        total_records = len(df)
+        steps_count = df['step'].iloc[-1] if 'step' in df.columns else "N/A"
+
+        # 2. Strategy & Logic
+        prompt_strategy = df['strategy'].unique().tolist()
+        psychotypes_list = df['psychotype'].unique().tolist()
+        bias_mode = df['bias'].unique().tolist()
+
+        # 3. RAG Status
+        rag_active = df['rag_enabled'].any()
+        rag_modes = df['rag_mode'].unique().tolist() if rag_active else ["Disabled"]
+
+        # 4. Final summary_data Dictionary
+        summary_data = {
+            "Metric": [
+                "Total Records",
+                "Steps",
+                "Sweep Parameter",
+                "Value Range",
+                "Estimated Processing Time",
+                "Avg. MS per Word",
+                "Avg. Validation Time",
+                "Prompt Strategy",
+                "Psychotypes",
+                "Biases",
+                "Split bias mode",
+                "RAG enabled",
+                "RAG configuration mode"
+            ],
+            "Value": [
+                total_records,
+                steps,
+                sweep_name,
+                sweep_range,
+                duration_str,
+                f"{df['ms_per_word'].mean():.2f} ms",
+                f"{df['validation_duration_ms'].mean() / 1000:.2f} sec",
+                ", ".join(map(str, prompt_strategy)),
+                ", ".join(map(str, psychotypes_list)),
+                ", ".join(map(str, bias_mode)),
+                "✅ Enabled" if st.session_state.get("split_biases", False) else "❌ Disabled",
+                "✅ Yes" if rag_active else "❌ No",
+                ", ".join([str(m) for m in rag_modes if m is not None])
+            ]
+        }
+        with st.expander("Summary for the current experiment", expanded=True):
+            # Convert dict → DataFrame first
+            summary_df = pd.DataFrame(summary_data)
+
+            # Cast all values to string if needed (avoids Arrow serialization errors)
+            summary_df = summary_df.astype(str)
+
+            # Display in Streamlit
+            st.table(summary_df)
+
+        # --- 3. Full Data View ---
+        with st.expander("Raw experiment logs", expanded=False):
+            st.dataframe(df, width='stretch')
+
+# ============================================================
+# Analytics
+# ============================================================
+with tab_analytics:
+    st.subheader("📈 Analytics")
     if st.session_state.history:
         # Load data from session history
         df = pd.json_normalize(st.session_state.history)
@@ -1308,10 +1484,12 @@ with tab_insights:
                 st.plotly_chart(figs[4], width='stretch', key="plot_matrix_cross")
             else:
                 st.warning(f"Missing columns: {[c for c in required_cols if c not in df.columns]}")
-
     else:
-        st.info("Run automation or ingest JSONL to populate the analytics dashboard.")
+        st.info("No experiment data found. Run a generation first or upload data set.")
 
+# ============================================================
+#  NLP Science
+# ============================================================
 with tab_nlp:
     st.subheader("🧪 Deep NLP Investigation (NLTK)")
     if st.session_state.history:
@@ -1322,7 +1500,7 @@ with tab_nlp:
             logger.debug(f'{full_df.columns}')
 
         # Layout for algorithms
-        sub_tab_nlp_1, sub_tab_nlp_2, sub_tab_nlp_3 = st.tabs(["sub_tab_nlp_1", "sub_tab_nlp_2", "sub_tab_nlp_3"])
+        sub_tab_nlp_1, sub_tab_nlp_2, sub_tab_nlp_3 = st.tabs(["NLP-1", "NLP-2", "NLP-3"])
         with sub_tab_nlp_1:
             # Row 1: POS Morphology Profile
             # Note: 'Adjectives', 'Nouns', and 'Verbs' are created in LabDataBridge
@@ -1341,7 +1519,8 @@ with tab_nlp:
             col_a, col_b = st.columns(2)
 
             with col_a:
-                st.write("**Cognitive Complexity (Readability vs Diversity)**")
+                st.write(
+                    "**Cognitive Complexity (Readability vs Diversity)** / ***Когнітивна складність (Читабельність vs Різноманітність)***")
                 # Schizoids usually cluster top-right (High ARI, High TTR)
                 st.plotly_chart(px.scatter(
                     full_df, x="readability_ari", y="corrected_ttr",
@@ -1350,7 +1529,8 @@ with tab_nlp:
                 ), width='stretch')
 
             with col_b:
-                st.write("**Emotional Engagement (Subjectivity vs Sentiment)**")
+                st.write(
+                    "**Emotional Engagement (Subjectivity vs Sentiment)** / ***Емоційна залученість (Суб'єктивність vs Тональність)***")
                 st.plotly_chart(px.scatter(
                     full_df, x="subjectivity", y="sentiment",
                     color="psychotype",
@@ -1367,7 +1547,9 @@ with tab_nlp:
             col_c, col_d = st.columns(2)
 
             with col_c:
-                st.write("**Emotional Stability (Sentiment Variance)**")
+                st.write(
+                    "**Emotional Stability (Sentiment Variance)** / ***Емоційна стабільність (Варіативність тональності)***")
+
                 st.plotly_chart(px.box(
                     full_df,
                     x="psychotype",
@@ -1378,7 +1560,7 @@ with tab_nlp:
                 ), width='stretch')
 
             with col_d:
-                st.write("**Repetition / Fixation Patterns**")
+                st.write("**Repetition / Fixation Patterns** / ***Патерни повторення / фіксації***")
                 st.plotly_chart(px.box(
                     full_df,
                     x="bias",
@@ -1390,7 +1572,8 @@ with tab_nlp:
                 ), width='stretch')
         with sub_tab_nlp_3:
             # --- Row 4: Sentence Structure ---
-            st.write("**Syntactic Flow (Sentence Length Distribution)**")
+            st.write(
+                "**Syntactic Flow (Sentence Length Distribution)** / ***Синтаксичний потік (Розподіл довжини речень)***")
             st.plotly_chart(px.box(
                 full_df, x="psychotype", y="avg_sentence_length",
                 color="psychotype", points="all", title="Sentence Length per Psychotype"
@@ -1400,7 +1583,7 @@ with tab_nlp:
             st.divider()
             col_e, col_e_e = st.columns(2)
             with col_e:
-                st.write("**Self-Focus vs Cognitive Rigidity**")
+                st.write("**Self-Focus vs Cognitive Rigidity** / ***Самофокусування vs Когнітивна ригідність***")
                 st.plotly_chart(px.scatter(
                     full_df,
                     x="neuro_self_focus",
@@ -1418,7 +1601,8 @@ with tab_nlp:
                 ), width='stretch')
 
             with col_e_e:
-                st.write("**Self-Focus vs Cognitive Rigidity (Bias Dependency)**")
+                st.write(
+                    "**Self-Focus vs Cognitive Rigidity (Bias Dependency)** / ***Самофокусування vs Когнітивна ригідність (Залежність від упередження)***")
                 st.plotly_chart(px.scatter(
                     full_df,
                     x="neuro_self_focus",
@@ -1438,7 +1622,7 @@ with tab_nlp:
             st.divider()
             col_f, col_f_f = st.columns(2)
             with col_f:
-                st.write("**Rigidity Distribution by Bias Type**")
+                st.write("**Rigidity Distribution by Bias Type** / ***Розподіл ригідності за типом упередження***")
                 st.plotly_chart(px.box(
                     full_df,
                     x="bias",
@@ -1450,7 +1634,7 @@ with tab_nlp:
                 ), width='stretch')
 
             with col_f_f:
-                st.write("**Abstraction vs Cognitive Load**")
+                st.write("**Abstraction vs Cognitive Load** / ***Абстрактність vs Когнітивне навантаження***")
                 st.plotly_chart(px.scatter(
                     full_df,
                     x="neuro_abstract_ratio_ext",
@@ -1466,7 +1650,7 @@ with tab_nlp:
             col_g, col_h = st.columns(2)
 
             with col_g:
-                st.write("**Narrative Coherence Distribution**")
+                st.write("**Narrative Coherence Distribution** / ***Розподіл наративної узгодженості***")
                 st.plotly_chart(px.box(
                     full_df,
                     x="psychotype",
@@ -1477,7 +1661,8 @@ with tab_nlp:
                 ), width='stretch')
 
             with col_h:
-                st.write("**Emotional Volatility (Sentence Variance)**")
+                st.write(
+                    "**Emotional Volatility (Sentence Variance)** / ***Емоційна волатильність (Варіативність речень)***")
                 st.plotly_chart(px.box(
                     full_df,
                     x="psychotype",
@@ -1489,12 +1674,14 @@ with tab_nlp:
     else:
         st.info("No experiment data found. Run a generation first or upload data set.")
 
+# ============================================================
+#  Clustering
+# ============================================================
 with tab_clusters:
-    if st.session_state.history:
-        st.subheader("🧬 Multi-Dimensional Analysis")
-        # 1. Processing
-        # raw_df = df #pd.json_normalize(st.session_state.history)
-
+    st.subheader("🧬 Multi-Dimensional Analysis")
+    if df is None or df.empty:
+        st.info("No experiment data found. Run a generation first or upload data set.")
+    else:
         # Layout for algorithms
         sub_tab_pca, sub_tab_hdbscan, sub_tab_hdbscan_UMAP, sub_tab_hdbscan_UMAP_old = st.tabs(
             ["K-Means (PCA)", "HDBSCAN (Density)", "sub_tab_hdbscan_UMAP", "sub_tab_hdbscan_UMAP_old"])
@@ -1640,7 +1827,8 @@ with tab_clusters:
                     st.plotly_chart(fig_hdb, width='stretch')
 
                 with plot_tab2:
-                    st.write("**Minimum Spanning Tree (MST) & Path Analysis**")
+                    st.write(
+                        "**Minimum Spanning Tree (MST) & Path Analysis** / ***Мінімальне остовне дерево (MST) та аналіз шляхів***")
 
                     # --- 1. Coloring Option ---
                     mst_color_mode = st.selectbox(
@@ -1649,17 +1837,18 @@ with tab_clusters:
                         help="Identify if specific models or psychotypes form isolated branches."
                     )
 
-                    import matplotlib.pyplot as plt
-
                     fig_mst, ax_mst = plt.subplots(figsize=(12, 8))
                     fig_mst.patch.set_facecolor('#0e1117')
                     ax_mst.set_facecolor('#0e1117')
-
+#
                     # Base MST Plot
-                    clusterer.minimum_spanning_tree_.plot(
-                        axis=ax_mst, node_size=0, edge_alpha=0.4,
-                        edge_cmap='viridis', edge_linewidth=1.5, vary_line_width=True
-                    )
+                    if len(df) > 32:
+                        clusterer.minimum_spanning_tree_.plot(
+                            axis=ax_mst, node_size=0, edge_alpha=0.4,
+                            edge_cmap='viridis', edge_linewidth=1.5, vary_line_width=True
+                        )
+                    else:
+                        st.warning("Dataset too small for MST projection (need >32 samples).")
 
                     # --- 2. Custom Node Overlay for "Model Fingerprint" ---
                     # We overlay the scatter points on top of the MST lines
@@ -1690,6 +1879,9 @@ with tab_clusters:
                         ax_mst.scatter(df_hdb['x'], df_hdb['y'], c='cyan', s=10, alpha=0.3)
 
                     ax_mst.axis('off')
+
+
+
                     st.pyplot(fig_mst)
 
                 # --- 3. Anomaly Analysis with Contrast Mode ---
@@ -1747,7 +1939,7 @@ with tab_clusters:
                         )
 
                     # 3. General Outlier Feed
-                    st.write("**Full Outlier Datafeed:**")
+                    st.write("**Full Outlier Datafeed:** / ***Повний потік даних аномалій:***")
                     display_cols = ['student', 'psychotype', 'bias', 'val', 'v_ok', 'output']
                     # st.dataframe(
                     #     outlier_df[display_cols].style.background_gradient(subset=['v_ok'], cmap='RdYlGn'),
@@ -1858,14 +2050,17 @@ with tab_clusters:
                             st.plotly_chart(fig, width='stretch')
 
                         with v_tab2:
-                            import matplotlib.pyplot as plt
+                            #
 
                             fig_mst, ax_mst = plt.subplots(figsize=(12, 8))
                             fig_mst.patch.set_facecolor('#0e1117')
                             ax_mst.set_facecolor('#0e1117')
-                            clusterer.minimum_spanning_tree_.plot(axis=ax_mst, node_size=0, edge_alpha=0.4,
-                                                                  edge_cmap='viridis', edge_linewidth=1.5,
-                                                                  vary_line_width=True)
+                            if len(df):
+                                clusterer.minimum_spanning_tree_.plot(axis=ax_mst, node_size=0, edge_alpha=0.4,
+                                                                      edge_cmap='viridis', edge_linewidth=1.5,
+                                                                      vary_line_width=True)
+                            else:
+                                st.warning("Dataset too small for MST projection (need >32 samples).")
 
                             target_col = "student" if mst_color_mode == "Student Model" else "psychotype"
                             if mst_color_mode != "Default (Density)" and target_col in df_hdb.columns:
@@ -1875,7 +2070,17 @@ with tab_clusters:
                                                    edgecolors='white', linewidth=0.6, zorder=3)
                                 ax_mst.legend(facecolor='#0e1117', labelcolor='white')
                             else:
-                                ax_mst.scatter(df_hdb['x_umap'], df_hdb['y_umap'], c='cyan', s=12, alpha=0.4)
+                                # Create a mask for outliers identified by HDBSCAN (labeled as -1)
+                                # These are points that don't fit well into any specific psychotype cluster
+                                m_noise = df_hdb[target_col] == -1
+
+                                # Plot noise as small, semi-transparent gray dots to keep focus on main clusters
+                                # This prevents 'hallucinations' or 'random' generations from skewing the visualization
+                                ax_mst.scatter(
+                                    df_hdb.loc[m_noise, 'x_umap'],
+                                    df_hdb.loc[m_noise, 'y_umap'],
+                                    c='gray', s=10, alpha=0.3, label='Noise'
+                                )
                             ax_mst.axis('off')
                             st.pyplot(fig_mst)
 
@@ -1948,7 +2153,7 @@ with tab_clusters:
                 min_size = st.number_input("Min Cluster Size", 2, 50, 5, key="umap_hdb_min_size_old")
                 min_samples = st.number_input("Min Samples (Noise)", 1, 20, 1, key="umap_hdb_min_samples_old")
             with col_h2:
-                st.write("**UMAP Projection**")
+                st.write("**UMAP Projection** / ***UMAP-проєкція***")
                 n_neighbors = st.slider("Neighbors (Local vs Global)", 2, 50, 15,
                                         key="umap_n_neighbors_old",
                                         help="Lower = focus on model differences. Higher = focus on global structure.")
@@ -2027,18 +2232,19 @@ with tab_clusters:
 
                     with plot_tab2:
                         st.write("**Minimum Spanning Tree (Path Analysis)**")
-                        import matplotlib.pyplot as plt
 
                         fig_mst, ax_mst = plt.subplots(figsize=(12, 8))
                         fig_mst.patch.set_facecolor('#0e1117')
                         ax_mst.set_facecolor('#0e1117')
 
                         # Plotting MST edges
-                        clusterer.minimum_spanning_tree_.plot(
-                            axis=ax_mst, node_size=0, edge_alpha=0.4,
-                            edge_cmap='viridis', edge_linewidth=1.5, vary_line_width=True
-                        )
-
+                        if len(df) > 32:
+                            clusterer.minimum_spanning_tree_.plot(
+                                axis=ax_mst, node_size=0, edge_alpha=0.4,
+                                edge_cmap='viridis', edge_linewidth=1.5, vary_line_width=True
+                            )
+                        else:
+                            st.warning("Dataset too small for MST projection (need >32 samples).")
                         # Overlaying colored nodes
                         if mst_color_mode != "Default (Density)":
                             target_col = "student" if mst_color_mode == "Student Model" else "psychotype"
@@ -2121,188 +2327,559 @@ with tab_clusters:
             else:
                 st.warning("Insufficient data for HDBSCAN. Please add more records.")
 
+# ============================================================
+# 🧬 MODEL EVALUATION
+# ============================================================
+
+with tab_model_evo:
+    st.subheader("🧬 Model Evaluation")
+
+    if df is None or df.empty:
+        st.info(
+            "No experiment data found. "
+            "Run a generation first or upload data set."
+        )
 
     else:
-        st.info("Run the student-teacher automation to populate the cluster discovery analysis.")
 
+        st.markdown(
+            """
+            Evaluate how well your linguistic / neuro metrics
+            predict a target label such as:
+            - hallucination
+            - truthful output
+            - anomaly
+            - psychotype
+            """
+        )
+
+        # ----------------------------------------------------
+        # LABEL COLUMN
+        # ----------------------------------------------------
+        possible_targets = [
+            col for col in df.columns
+            if (
+                    2 <= df[col].nunique() <= 10
+                    and df[col].dtype != "float64"
+            )
+        ]
+
+        if not possible_targets:
+            st.warning(
+                "No suitable target column found.\n\n"
+                "You need a label column like:\n"
+                "- label\n"
+                "- hallucination\n"
+                "- is_valid\n"
+                "- psychotype"
+            )
+
+        else:
+
+            target_column = st.selectbox(
+                "🎯 Select Target Column",
+                possible_targets,
+                index=0
+            )
+
+            test_size = st.slider(
+                "📦 Test Size",
+                min_value=0.1,
+                max_value=0.5,
+                value=0.2,
+                step=0.05
+            )
+
+            # ------------------------------------------------
+            # RUN EVALUATION
+            # ------------------------------------------------
+            if st.button("🚀 Run Evaluation"):
+
+                try:
+
+                    from core.model_evaluation import ModelEvaluation
+
+                    evaluator = ModelEvaluation(
+                        target_column=target_column
+                    )
+
+                    results = evaluator.evaluate(
+                        df,
+                        test_size=test_size
+                    )
+
+                    # ========================================
+                    # METRICS
+                    # ========================================
+                    st.markdown("### 📊 Evaluation Metrics")
+
+                    c1, c2, c3, c4 = st.columns(4)
+
+                    c1.metric(
+                        "Precision",
+                        results["precision"]
+                    )
+
+                    c2.metric(
+                        "Recall",
+                        results["recall"]
+                    )
+
+                    c3.metric(
+                        "F1 Score",
+                        results["f1_score"]
+                    )
+
+                    c4.metric(
+                        "ROC-AUC",
+                        results["roc_auc"]
+                    )
+
+                    # ========================================
+                    # CONFUSION MATRIX
+                    # ========================================
+                    st.markdown("### 🔀 Confusion Matrix")
+
+                    cm = results["confusion_matrix"]
+
+                    n_classes = len(cm)
+
+                    cm_df = pd.DataFrame(
+                        cm,
+                        columns=[f"Pred {i}" for i in range(n_classes)],
+                        index=[f"True {i}" for i in range(n_classes)]
+                    )
+
+                    st.write("Classes detected:", list(range(n_classes)))
+
+                    st.dataframe(cm_df, width='stretch')
+
+                    fig = px.imshow(
+                        cm,
+                        text_auto=True,
+                        title="Confusion Matrix Heatmap"
+                    )
+
+                    st.plotly_chart(fig, width='stretch')
+                    # ========================================
+                    # CLASSIFICATION REPORT
+                    # ========================================
+                    st.markdown("### 📑 Classification Report")
+
+                    st.code(
+                        results["classification_report"],
+                        language="text"
+                    )
+
+                    # ========================================
+                    # TOP FEATURES
+                    # ========================================
+                    st.markdown("### 🧠 Top Predictive Features")
+
+                    feature_df = pd.DataFrame(
+                        results["top_features"]
+                    )
+
+                    st.dataframe(
+                        feature_df,
+                        width='stretch'
+                    )
+
+                    # ========================================
+                    # BAR CHART
+                    # ========================================
+                    if not feature_df.empty:
+                        fig = px.bar(
+                            feature_df.head(10),
+                            x="feature",
+                            y="abs_weight",
+                            title="Feature Importance"
+                        )
+
+                        st.plotly_chart(
+                            fig,
+                            width='stretch'
+                        )
+
+                except Exception as e:
+                    st.exception(e)
+
+# ============================================================
+# Benchmark
+# ============================================================
 with tab_benchmark:
     st.header("📑 LLM Benchmark Report")
 
     if df is None or df.empty:
-        st.warning("No data loaded. Please run an experiment or ingest JSONL first.")
-        st.stop()
-
-    # --- 1. IMPROVED DATA CLEANUP (Logic Alignment) ---
-    df_clean = df.copy()
-
-    # Apply standard filters to match the Clustering Tab
-    # 1. Remove obvious technical failures (word_count 0)
-    df_clean = df_clean[df_clean["word_count"] > 0]
-    # 2. Filter by validation flag if available
-    if 'v_ok' in df_clean.columns:
-        # We keep only 'v_ok == 1' for the "clean" benchmark,
-        # but the success rate chart will use the full df to show failures.
-        df_valid = df_clean[df_clean["v_ok"] == 1]
+        st.info("No experiment data found. Run a generation first or upload data set.")
     else:
-        df_valid = df_clean.copy()
 
-    # 3. Deduplication (Text + Model fingerprint)
-    df_valid = df_valid.drop_duplicates(subset=["output", "student", "teacher"])
+        # --- 1. IMPROVED DATA CLEANUP (Logic Alignment) ---
+        df_clean = df.copy()
 
-    # --- 2. DATASET OVERVIEW ---
-    st.subheader("📊 Dataset Overview")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Samples", len(df))
-    col2.metric("Valid Samples", len(df_valid))
-    col3.metric("Unique Students", df_valid["student"].nunique())
-    col4.metric("Unique Teachers", df_valid["teacher"].nunique())
+        # Apply standard filters to match the Clustering Tab
+        # 1. Remove obvious technical failures (word_count 0)
+        df_clean = df_clean[df_clean["word_count"] > 0]
+        # 2. Filter by validation flag if available
+        if 'v_ok' in df_clean.columns:
+            # We keep only 'v_ok == 1' for the "clean" benchmark,
+            # but the success rate chart will use the full df to show failures.
+            df_valid = df_clean[df_clean["v_ok"] == 1]
+        else:
+            df_valid = df_clean.copy()
 
-    # --- 3. SUCCESS RATE (Uses full clean df to include failures) ---
-    st.subheader("✅ Validation Success Rate")
-    success_df = (
-        df_clean.groupby("student")["v_ok_numeric"]
-        .mean()
-        .sort_values(ascending=False)
-        .reset_index()
-    )
-    fig_success = px.bar(
-        success_df, x="student", y="v_ok_numeric",
-        title="Pass Rate (%) by Model (v_ok_numeric)",
-        labels={'v_ok_numeric': 'Success Probability', 'student': 'Model Name'},
-        template="plotly_dark",
-        color="v_ok_numeric",
-        color_continuous_scale="RdYlGn"
-    )
-    st.plotly_chart(fig_success, width='stretch')
+        # 3. Deduplication (Text + Model fingerprint)
+        df_valid = df_valid.drop_duplicates(subset=["output", "student", "teacher"])
 
-    # --- 4. PERFORMANCE (Inference Speed) ---
-    st.subheader("⚡ Performance Metrics")
-    perf_df = (
-        df_valid.groupby("student")[["ms_per_word", "duration_ms"]]
-        .mean()
-        .reset_index()
-    )
-    fig_perf = px.bar(
-        perf_df, x="student", y="ms_per_word",
-        title="Inference Speed (Lower is Better)",
-        labels={'ms_per_word': 'Latency (ms/word)'},
-        template="plotly_dark"
-    )
-    st.plotly_chart(fig_perf, width='stretch')
+        # --- 2. DATASET OVERVIEW ---
+        st.subheader("📊 Dataset Overview")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Total Samples", len(df))
+        col2.metric("Valid Samples", len(df_valid))
+        col3.metric("Unique Students", df_valid["student"].nunique())
+        col4.metric("Unique Teachers", df_valid["teacher"].nunique())
 
-    # --- 5. QUALITY HEATMAP ---
-    st.subheader("💎 Quality Metrics Heatmap")
-    quality_cols = [
-        "coherence", "cognitive_load", "lexical_density",
-        "semantic_overlap", "expansion_ratio"
-    ]
-    # Ensure columns exist before plotting
-    existing_quality = [c for c in quality_cols if c in df_valid.columns]
-    if existing_quality:
-        quality_df = df_valid.groupby("student")[existing_quality].mean().reset_index()
-        fig_quality = px.imshow(
-            quality_df.set_index("student"),
-            text_auto=".3f",
-            title="Avg Quality Scores per Model",
-            color_continuous_scale="Viridis",
+        # --- 3. SUCCESS RATE (Uses full clean df to include failures) ---
+        st.subheader("✅ Validation Success Rate")
+        success_df = (
+            df_clean.groupby("student")["v_ok_numeric"]
+            .mean()
+            .sort_values(ascending=False)
+            .reset_index()
+        )
+        fig_success = px.bar(
+            success_df, x="student", y="v_ok_numeric",
+            title="Pass Rate (%) by Model (v_ok_numeric)",
+            labels={'v_ok_numeric': 'Success Probability', 'student': 'Model Name'},
+            template="plotly_dark",
+            color="v_ok_numeric",
+            color_continuous_scale="RdYlGn"
+        )
+        st.plotly_chart(fig_success, width='stretch')
+
+        # --- 4. PERFORMANCE (Inference Speed) ---
+        st.subheader("⚡ Performance Metrics")
+        perf_df = (
+            df_valid.groupby("student")[["ms_per_word", "duration_ms"]]
+            .mean()
+            .reset_index()
+        )
+        fig_perf = px.bar(
+            perf_df, x="student", y="ms_per_word",
+            title="Inference Speed (Lower is Better)",
+            labels={'ms_per_word': 'Latency (ms/word)'},
             template="plotly_dark"
         )
-        st.plotly_chart(fig_quality, width='stretch')
+        st.plotly_chart(fig_perf, width='stretch')
 
-    # --- 6. PSYCHOLINGUISTIC SIGNATURE ---
-    st.subheader("🧠 Psycholinguistic Signature")
-    psycho_cols = [
-        "self_focus", "modality", "cognitive_density",
-        "abstract_ratio", "repetition_score"
-    ]
-    existing_psy = [c for c in psycho_cols if c in df_valid.columns]
-    if existing_psy:
-        psycho_df = df_valid.groupby("student")[existing_psy].mean().reset_index()
-        fig_psy = px.bar(
-            psycho_df, x="student", y=existing_psy,
-            barmode="group",
-            title="Linguistic Trait Distribution",
-            template="plotly_dark"
+        # --- 5. QUALITY HEATMAP ---
+        st.subheader("💎 Quality Metrics Heatmap")
+        quality_cols = [
+            "coherence", "cognitive_load", "lexical_density",
+            "semantic_overlap", "expansion_ratio"
+        ]
+        # Ensure columns exist before plotting
+        existing_quality = [c for c in quality_cols if c in df_valid.columns]
+        if existing_quality:
+            quality_df = df_valid.groupby("student")[existing_quality].mean().reset_index()
+            fig_quality = px.imshow(
+                quality_df.set_index("student"),
+                text_auto=".3f",
+                title="Avg Quality Scores per Model",
+                color_continuous_scale="Viridis",
+                template="plotly_dark"
+            )
+            st.plotly_chart(fig_quality, width='stretch')
+
+        # --- 6. PSYCHOLINGUISTIC SIGNATURE ---
+        st.subheader("🧠 Psycholinguistic Signature")
+        psycho_cols = [
+            "self_focus", "modality", "cognitive_density",
+            "abstract_ratio", "repetition_score"
+        ]
+        existing_psy = [c for c in psycho_cols if c in df_valid.columns]
+        if existing_psy:
+            psycho_df = df_valid.groupby("student")[existing_psy].mean().reset_index()
+            fig_psy = px.bar(
+                psycho_df, x="student", y=existing_psy,
+                barmode="group",
+                title="Linguistic Trait Distribution",
+                template="plotly_dark"
+            )
+            st.plotly_chart(fig_psy, width='stretch')
+
+        # --- 7. WEIGHTED LEADERBOARD ---
+        st.subheader("🏆 Model Leaderboard")
+        lb_metrics = {
+            "v_ok_numeric": "mean",
+            "coherence": "mean",
+            "cognitive_load": "mean",
+            "ms_per_word": "mean"
+        }
+        # --- Leaderboard score ---
+        leaderboard = df_valid.groupby("student").agg({
+            "v_ok_numeric": "mean",
+            "coherence": "mean",
+            "semantic_overlap": "mean",  # NEW: How well it mimics the teacher
+            "ms_per_word": "mean"
+        }).reset_index()
+
+        # Calculate 'Persona Precision' (Higher is better)
+        leaderboard["mimicry_score"] = leaderboard["semantic_overlap"] * 100
+
+        # Normalized Speed Score (Inverse of ms_per_word)
+        max_ms = leaderboard["ms_per_word"].max()
+        leaderboard["speed_score"] = (max_ms - leaderboard["ms_per_word"]) / max_ms
+
+        # Calculated Weighted Final Score
+        # Logic: 30% Success, 30% Mimicry, 20% Logic, 20% Speed
+        leaderboard["final_score"] = (
+                leaderboard["v_ok_numeric"] * 0.3 +
+                leaderboard["mimicry_score"] * 0.3 +
+                leaderboard["coherence"] * 0.2 +
+                leaderboard["speed_score"] * 0.2
         )
-        st.plotly_chart(fig_psy, width='stretch')
 
-    # --- 7. WEIGHTED LEADERBOARD ---
-    st.subheader("🏆 Model Leaderboard")
-    lb_metrics = {
-        "v_ok_numeric": "mean",
-        "coherence": "mean",
-        "cognitive_load": "mean",
-        "ms_per_word": "mean"
-    }
-    # --- Leaderboard score ---
-    leaderboard = df_valid.groupby("student").agg({
-        "v_ok_numeric": "mean",
-        "coherence": "mean",
-        "semantic_overlap": "mean",  # NEW: How well it mimics the teacher
-        "ms_per_word": "mean"
-    }).reset_index()
+        leaderboard = leaderboard.sort_values("final_score", ascending=False).reset_index(drop=True)
+        st.dataframe(
+            leaderboard.astype(object).style.background_gradient(subset=["final_score"], cmap="Greens"),
+            width='stretch'
+        )
 
-    # Calculate 'Persona Precision' (Higher is better)
-    leaderboard["mimicry_score"] = leaderboard["semantic_overlap"] * 100
+        # --- 8. AUTO INTERPRETATION ---
+        if not leaderboard.empty:
+            best_model = leaderboard.iloc[0]["student"]
+            st.markdown(f"""
+            ### 🥇 Champion: **{best_model}**
+    
+            **Behavioral Insights:**
+            - **Stability:** Top validation success rate ensures high instruction following.
+            - **Linguistic Depth:** Balanced cognitive load scores suggest nuanced persona emulation.
+            - **Inference Optimization:** Demonstrates a superior words-per-second ratio.
+    
+            **Strategic Interpretation:** 
+            This model is the most recommended for **{best_model}** persona replication within the current context-aware sweep.
+            """)
 
-    # Normalized Speed Score (Inverse of ms_per_word)
-    max_ms = leaderboard["ms_per_word"].max()
-    leaderboard["speed_score"] = (max_ms - leaderboard["ms_per_word"]) / max_ms
-
-    # Calculated Weighted Final Score
-    # Logic: 30% Success, 30% Mimicry, 20% Logic, 20% Speed
-    leaderboard["final_score"] = (
-            leaderboard["v_ok_numeric"] * 0.3 +
-            leaderboard["mimicry_score"] * 0.3 +
-            leaderboard["coherence"] * 0.2 +
-            leaderboard["speed_score"] * 0.2
-    )
-
-    leaderboard = leaderboard.sort_values("final_score", ascending=False).reset_index(drop=True)
-    st.dataframe(
-        leaderboard.astype(object).style.background_gradient(subset=["final_score"], cmap="Greens"),
-        width='stretch'
-    )
-
-    # --- 8. AUTO INTERPRETATION ---
-    if not leaderboard.empty:
-        best_model = leaderboard.iloc[0]["student"]
-        st.markdown(f"""
-        ### 🥇 Champion: **{best_model}**
-
-        **Behavioral Insights:**
-        - **Stability:** Top validation success rate ensures high instruction following.
-        - **Linguistic Depth:** Balanced cognitive load scores suggest nuanced persona emulation.
-        - **Inference Optimization:** Demonstrates a superior words-per-second ratio.
-
-        **Strategic Interpretation:** 
-        This model is the most recommended for **{best_model}** persona replication within the current context-aware sweep.
-        """)
-
+# ============================================================
+# Monitor
+# ============================================================
 with tab_monitor:
     st.subheader("🖥️ Ollama Management")
+
+    # ============================================================
+    # Pull Model
+    # ============================================================
+    st.markdown("##### Pull Model")
+    with st.expander("📦 Recommended Models for ~4GB VRAM", expanded=False):
+
+        model_df = pd.DataFrame([
+            {"Model": "gemma2:2b", "Size (GB)": 1.6},
+            {"Model": "phi3:mini", "Size (GB)": 2.2},
+            {"Model": "llama3.2:3b", "Size (GB)": 2.0},
+            {"Model": "qwen2.5:3b", "Size (GB)": 2.1},
+            {"Model": "tinyllama:latest", "Size (GB)": 0.7},
+            {"Model": "stablelm2:1.6b", "Size (GB)": 1.0},
+            {"Model": "deepseek-r1:1.5b", "Size (GB)": 1.1},
+            {"Model": "mistral:7b-instruct-q4_K_M", "Size (GB)": 4.1},
+            {"Model": "llama3:8b-instruct-q4_K_M", "Size (GB)": 4.7},
+            {"Model": "qwen2.5:7b-instruct-q4_K_M", "Size (GB)": 4.4},
+        ])
+
+        st.dataframe(
+            model_df,
+            width='stretch',
+            hide_index=True
+        )
+
+        st.caption(
+            "Q4 quantized models usually fit into ~4GB VRAM with partial CPU offloading."
+        )
+
+    pull_col1, pull_col2 = st.columns([8, 1])
+
+    with pull_col1:
+        model_to_pull = st.text_input(
+            label="Pull Model",
+            placeholder="e.g. llama3:latest",
+            label_visibility="collapsed",
+            key="model_to_pull"
+        )
+
+    with pull_col2:
+        pull_clicked = st.button("🚀 Pull", width='stretch')
+
+    # ============================================================
+    # START PULL
+    # ============================================================
+    if pull_clicked:
+
+        if model_to_pull.strip():
+
+            try:
+                cmd = ["ollama", "pull", model_to_pull.strip()]
+
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+
+                st.session_state.pull_running = True
+                st.session_state.pull_model_name = model_to_pull.strip()
+                st.session_state.pull_pid = process.pid
+
+                st.toast(f"Started pulling {model_to_pull}")
+
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"Pull failed: {e}")
+
+        else:
+            st.warning("Enter model name")
+
+    # ============================================================
+    # LIVE STATUS PANEL
+    # ============================================================
+    if st.session_state.pull_running:
+
+        current_model = st.session_state.pull_model_name
+
+        st.info(f"📥 Pulling: {current_model}")
+
+        # fake animated progress
+        progress_placeholder = st.empty()
+
+        if "pull_progress" not in st.session_state:
+            st.session_state.pull_progress = 0
+
+        st.session_state.pull_progress = min(
+            st.session_state.pull_progress + 3,
+            95
+        )
+
+        progress_placeholder.progress(
+            st.session_state.pull_progress,
+            text=f"Downloading {current_model} ..."
+        )
+        # ========================================================
+        # Buttons
+        # ========================================================
+        col_stop1, col_stop2 = st.columns([1, 4])
+
+        with col_stop1:
+
+            if st.button("🛑 Cancel Pull"):
+
+                try:
+
+                    pid = st.session_state.pull_pid
+
+                    if pid:
+
+                        if os.name == "nt":
+                            subprocess.call(
+                                ["taskkill", "/F", "/PID", str(pid)]
+                            )
+                        else:
+                            subprocess.call(
+                                ["kill", "-9", str(pid)]
+                            )
+
+                    st.session_state.pull_running = False
+                    st.session_state.pull_pid = None
+                    st.session_state.pull_model_name = ""
+
+                    st.warning("Pull cancelled")
+                    st.session_state.pull_progress = 0
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(str(e))
+
+        with col_stop2:
+            st.caption(
+                "Large models may take several minutes depending on internet speed."
+            )
+
+        # ========================================================
+        # CHECK INSTALL COMPLETE
+        # ========================================================
+        try:
+
+            installed_models = [
+                m.model for m in ollama.list().models
+            ]
+
+            if any(current_model.lower() in m.lower() for m in installed_models):
+                st.session_state.pull_running = False
+                st.session_state.pull_pid = None
+                st.session_state.pull_model_name = ""
+                st.session_state.pull_progress = 100
+
+                progress_placeholder.progress(
+                    100,
+                    text=f"{current_model} installed"
+                )
+
+                st.success(f"✅ {current_model} installed successfully")
+
+                time.sleep(1)
+
+                st.session_state.pull_progress = 0
+
+                st.rerun()
+
+        except:
+            pass
+        # ========================================================
+        # AUTO REFRESH
+        # ========================================================
+        time.sleep(2)
+        st.rerun()
+
+    # ============================================================
+    # Installed Models
+    # ============================================================
+
     try:
         models = ollama.list().models
-        for m in models:
-            col1, col2, col3 = st.columns([3, 2, 1])
-            col1.write(f"**{m.model}**")
-            col2.write(f"💾 {m.size / 1e9:.2f} GB")
-            if col3.button("🗑️", key=f"del_{m.model}"):
-                ollama.delete(m.model)
-                st.rerun()
-    except:
-        st.warning("Ollama connection error.")
 
-with tab_debug:
-    st.write("### Session State Explorer")
-    st.json(st.session_state.to_dict())
+        if not models:
+            st.info("No local models installed")
+
+        for m in models:
+            col1, col2, col3 = st.columns([6, 2, 1.5])
+
+            with col1:
+                st.write(f"**{m.model}**")
+
+            with col2:
+                st.write(f"💾 {m.size / 1e9:.2f} GB")
+
+            with col3:
+                if st.checkbox("🗑️", key=f"check_{m.model}"):
+                    if st.button("Confirm Delete?", key=f"del_{m.model}", type="primary"):
+                        ollama.delete(m.model)
+                        st.rerun()
+
+    except Exception as e:
+        st.warning(f"Ollama connection error: {e}")
+
+# ============================================================
+# Debug << tab presence depends on the SHOW_DEBUG_TAB flag
+# ============================================================
+if SHOW_DEBUG_TAB:
+    with tab_debug:
+        st.write("### Session State Explorer")
+        st.json(st.session_state.to_dict())
 
     if st.session_state.history:
         # 1. Flatten the JSON
         df = pd.json_normalize(st.session_state.history)
 
         # 2. FORCE conversion to standard Python objects
-        # This removes the problematic StringDtype(na_value=nan)
         for col in df.columns:
             if df[col].dtype.name in ['string', 'object', 'category']:
                 # Fill NaNs first, then convert to basic object type
@@ -2313,14 +2890,17 @@ with tab_debug:
         # 3. Final safety check: if Arrow still complains, use a copy
         df_display = df.copy()
 
-        with st.expander("Schema check"):
-            # use_container_width is the modern replacement for width='stretch'
-            st.dataframe(df_display, width='stretch')
-            st.subheader("Current Data Schema")
-            st.write(df.dtypes)
+    with st.expander("Schema check"):
+        # width='stretch' is the modern replacement for width='stretch'
+        st.dataframe(df_display, width='stretch')
+        st.subheader("Current Data Schema")
+        st.write(df.dtypes)
 
+# ============================================================
+# FAQ
+# ============================================================
 with tab_faq:
-    st.subheader("📚 Metric Methodology & User Guide")
+    st.subheader("📚 User Guide & Metric Methodology")
     faq_lang = st.segmented_control("Select Language", options=["English", "Українська"], default="English")
 
     # 1. Get the absolute path to the directory containing streamlit_app.py

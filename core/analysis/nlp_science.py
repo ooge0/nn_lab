@@ -14,11 +14,11 @@ class PsychScientist:
         self.stop_words = set(stopwords.words('english'))
 
         # --- Psycholinguistic lexicons ---
-        self.self_pronouns = {"i", "me", "my", "mine", "myself"}
-        self.modal_verbs = {"must", "should", "need", "have", "ought"}
+        self.self_pronouns = {"i", "me", "my", "mine", "myself", "we", "us", "our", "ours", "ourselves"}
+        self.modal_verbs = {"must", "should", "need", "have", "ought", "shall", "may", "might", "could", "can", "would"}
         self.cognitive_verbs = {
-            "think", "believe", "understand", "consider",
-            "realize", "assume", "know"
+            "think", "believe", "understand", "consider", "realize", "assume", "know", "analyze", "judge", "evaluate",
+            "imagine", "remember", "predict", "decide"
         }
 
         # POS grouping

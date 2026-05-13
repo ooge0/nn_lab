@@ -1,4 +1,13 @@
+```markdown
 # Psycho-Data-Augmentor
+
+**Quick Summary – Psych Data Lab**
+- App purpose: run AI/NLP models in different modes (Teacher–Student, Self‑Critic, Blind Mode) and collect structured results.
+- Parameters: supports sweeps of temperature, top‑p, penalties, max tokens.
+- RAG integration: retrieves knowledge chunks to enrich prompts.
+- Analysis: calculates sentiment, subjectivity, lexical density, repetition, POS distribution, plus neuro‑metrics like rigidity, cognitive load, coherence, self‑focus.
+- Visualization: PCA, HDBSCAN, UMAP clustering to compare model behavior and detect anomalies.
+- Outcome: helps evaluate how models differ, what patterns they produce, and how parameters influence style and quality.
 
 A tool for generating and analyzing synthetic psycholinguistic datasets using local LLMs (Ollama) and NLP feature extraction.
 
@@ -33,6 +42,9 @@ source .venv/bin/activate
 
 ```bash
 pip install --upgrade pip  
+```
+
+```bash
 pip install -r requirements.txt
 ```
 ---
@@ -80,12 +92,12 @@ ollama list
 ```
 streamlit_app.py                                            # streamlit app file  
 core/nlp_science.py                                         # psycholinguistic analysis (NLTK-based)  
-core/ data_contract.py                                      # contracts and data validation logic 
-core/ neuro_metrics.py                                      # neuro_linguistic  analysis 
+core/data_contract.py                                       # contracts and data validation logic 
+core/neuro_metrics.py                                       # neuro_linguistic analysis 
 core/calculate_advanced_linguistic_metrics.py               # advanced linguistic metrics
 results/{custom_file_name_for_specific_execution}.jsonl     # output dataset (JSONL format)
 tests/                                                      # folder with tests
-interfaces/                                                 # CLI and Web (Streamlit) entry points. (Will developed later)
+interfaces/                                                 # CLI and Web (Streamlit) entry points (planned)
 ```
 
 ### Core Pipeline
@@ -94,21 +106,31 @@ interfaces/                                                 # CLI and Web (Strea
 - Extract linguistic features using NLTK + TextBlob
 - Store structured dataset (JSONL)
 - Visualize results in Streamlit
+
 ---
 
 ## NLP Feature Set
 
-- sentiment (VADER)
-- subjectivity (TextBlob)
+- sentiment (VADER) → \[Sentiment = (Positive − Negative) / Total\]
+- subjectivity (TextBlob) → \[Subjectivity = Subjective Words / Total Words\]
 - lexical diversity (corrected TTR)
 - readability (ARI)
 - POS distribution
-- self-focus ratio
+- self-focus ratio → \[SelfFocus = Self Pronouns / Total Pronouns\]
 - modality strength
 - cognitive density
-- repetition score
+- repetition score → \[Repetition = Repeated Tokens / Total Tokens\]
 - sentiment variance
 - abstractness ratio (WordNet heuristic)
+
+---
+
+## Neuro-Metrics
+
+- rigidity → \[Rigidity = (Imperatives + Repetitions) / Total Sentences\]
+- cognitive load → \[Cognitive Load = Complex Words / Total Words\]
+- coherence (semantic similarity between sentences)
+- anomaly detection (cluster outliers)
 
 ---
 
@@ -145,7 +167,57 @@ Psychotypes:
 
 ---
 
+## OLLAMA MODEL DOWNLOAD MONITORING
+
+### WINDOWS (PowerShell)
+
+#### Pull model manually:
+```bash
+ollama pull mistral:7b
+```
+
+#### Show installed models:
+```bash
+ollama list
+```
+
+#### Stop current download:
+CTRL + C
+
+#### Check Ollama service:
+```bash
+Get-Process ollama
+```
+ 
+### LINUX / MACOS
+#### Pull model manually:
+```bash
+ollama pull mistral:7b
+```
+
+#### Show installed models:
+```bash
+ollama list
+```
+
+#### Stop current download:
+CTRL + C
+
+#### Check running ollama processes:
+```bash
+ps aux | grep ollama
+```
+
+#### Kill stuck process:
+```bash
+pkill ollama
+```
+
+---
+
 ## Notes
 
-- App works on Windows 11 and Ubuntu
-- Fully local via Ollama
+- App works on Windows 11 and Ubuntu  
+- Fully local via Ollama  
+- Designed for model evaluation, psychotype transformation, and behavior analysis
+```

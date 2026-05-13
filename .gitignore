@@ -1,35 +1,17 @@
-# Created by .ignore support plugin (hsz.mobi)
-### Python template
+### VirtualEnv
+.venv
 
-# Distribution / packaging
-.Python
-env/
-
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
 
 # Sphinx documentation
-docs/_build/
+/docs/
 
-# pyenv
-.python-version
-
-# dotenv
-.env
-
-
-### VirtualEnv template
-# Virtualenv
-
-.venv
 
 # idea folder, uncomment if you don't need it
 .idea
 
 #other dirs
-scr/promt_evaluation_guide/logs
-scr/promt_evaluation_guide/results
-/scr/NLP/psycho_data_augmentor/results/
-/scr/NLP/psycho_data_augmentor/logs/
+
+/.pytest_cache
+/logs/
+/results/
+/__pycache__
