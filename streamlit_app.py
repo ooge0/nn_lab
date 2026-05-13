@@ -1530,7 +1530,7 @@ with tab_nlp:
 
             with col_b:
                 st.write(
-                    "**Emotional Engagement (Subjectivity vs Sentiment)** / ***Емоційна залученість (Суб'єктивність vs Тональність)***")
+                    "**Emotional Engagement (Subjectivity vs Sentiment)** ")
                 st.plotly_chart(px.scatter(
                     full_df, x="subjectivity", y="sentiment",
                     color="psychotype",
@@ -1548,7 +1548,7 @@ with tab_nlp:
 
             with col_c:
                 st.write(
-                    "**Emotional Stability (Sentiment Variance)** / ***Емоційна стабільність (Варіативність тональності)***")
+                    "**Emotional Stability (Sentiment Variance)**")
 
                 st.plotly_chart(px.box(
                     full_df,
@@ -1560,7 +1560,7 @@ with tab_nlp:
                 ), width='stretch')
 
             with col_d:
-                st.write("**Repetition / Fixation Patterns** / ***Патерни повторення / фіксації***")
+                st.write("**Repetition / Fixation Patterns**")
                 st.plotly_chart(px.box(
                     full_df,
                     x="bias",
@@ -1583,7 +1583,7 @@ with tab_nlp:
             st.divider()
             col_e, col_e_e = st.columns(2)
             with col_e:
-                st.write("**Self-Focus vs Cognitive Rigidity** / ***Самофокусування vs Когнітивна ригідність***")
+                st.write("**Self-Focus vs Cognitive Rigidity** ")
                 st.plotly_chart(px.scatter(
                     full_df,
                     x="neuro_self_focus",
@@ -1622,7 +1622,7 @@ with tab_nlp:
             st.divider()
             col_f, col_f_f = st.columns(2)
             with col_f:
-                st.write("**Rigidity Distribution by Bias Type** / ***Розподіл ригідності за типом упередження***")
+                st.write("**Rigidity Distribution by Bias Type** ")
                 st.plotly_chart(px.box(
                     full_df,
                     x="bias",
@@ -1634,7 +1634,7 @@ with tab_nlp:
                 ), width='stretch')
 
             with col_f_f:
-                st.write("**Abstraction vs Cognitive Load** / ***Абстрактність vs Когнітивне навантаження***")
+                st.write("**Abstraction vs Cognitive Load** ")
                 st.plotly_chart(px.scatter(
                     full_df,
                     x="neuro_abstract_ratio_ext",
@@ -1650,7 +1650,7 @@ with tab_nlp:
             col_g, col_h = st.columns(2)
 
             with col_g:
-                st.write("**Narrative Coherence Distribution** / ***Розподіл наративної узгодженості***")
+                st.write("**Narrative Coherence Distribution** ")
                 st.plotly_chart(px.box(
                     full_df,
                     x="psychotype",
