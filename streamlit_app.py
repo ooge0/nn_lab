@@ -1520,7 +1520,7 @@ with tab_nlp:
 
             with col_a:
                 st.write(
-                    "**Cognitive Complexity (Readability vs Diversity)** / ***Когнітивна складність (Читабельність vs Різноманітність)***")
+                    "**Cognitive Complexity (Readability vs Diversity)**")
                 # Schizoids usually cluster top-right (High ARI, High TTR)
                 st.plotly_chart(px.scatter(
                     full_df, x="readability_ari", y="corrected_ttr",
@@ -1573,7 +1573,7 @@ with tab_nlp:
         with sub_tab_nlp_3:
             # --- Row 4: Sentence Structure ---
             st.write(
-                "**Syntactic Flow (Sentence Length Distribution)** / ***Синтаксичний потік (Розподіл довжини речень)***")
+                "**Syntactic Flow (Sentence Length Distribution)**")
             st.plotly_chart(px.box(
                 full_df, x="psychotype", y="avg_sentence_length",
                 color="psychotype", points="all", title="Sentence Length per Psychotype"
@@ -1602,7 +1602,7 @@ with tab_nlp:
 
             with col_e_e:
                 st.write(
-                    "**Self-Focus vs Cognitive Rigidity (Bias Dependency)** / ***Самофокусування vs Когнітивна ригідність (Залежність від упередження)***")
+                    "**Self-Focus vs Cognitive Rigidity (Bias Dependency)**")
                 st.plotly_chart(px.scatter(
                     full_df,
                     x="neuro_self_focus",
@@ -1662,7 +1662,7 @@ with tab_nlp:
 
             with col_h:
                 st.write(
-                    "**Emotional Volatility (Sentence Variance)** / ***Емоційна волатильність (Варіативність речень)***")
+                    "**Emotional Volatility (Sentence Variance)**")
                 st.plotly_chart(px.box(
                     full_df,
                     x="psychotype",
@@ -1828,7 +1828,7 @@ with tab_clusters:
 
                 with plot_tab2:
                     st.write(
-                        "**Minimum Spanning Tree (MST) & Path Analysis** / ***Мінімальне остовне дерево (MST) та аналіз шляхів***")
+                        "**Minimum Spanning Tree (MST) & Path Analysis**")
 
                     # --- 1. Coloring Option ---
                     mst_color_mode = st.selectbox(
@@ -1939,7 +1939,7 @@ with tab_clusters:
                         )
 
                     # 3. General Outlier Feed
-                    st.write("**Full Outlier Datafeed:** / ***Повний потік даних аномалій:***")
+                    st.write("**Full Outlier Datafeed:**")
                     display_cols = ['student', 'psychotype', 'bias', 'val', 'v_ok', 'output']
                     # st.dataframe(
                     #     outlier_df[display_cols].style.background_gradient(subset=['v_ok'], cmap='RdYlGn'),
@@ -2153,7 +2153,7 @@ with tab_clusters:
                 min_size = st.number_input("Min Cluster Size", 2, 50, 5, key="umap_hdb_min_size_old")
                 min_samples = st.number_input("Min Samples (Noise)", 1, 20, 1, key="umap_hdb_min_samples_old")
             with col_h2:
-                st.write("**UMAP Projection** / ***UMAP-проєкція***")
+                st.write("**UMAP Projection**")
                 n_neighbors = st.slider("Neighbors (Local vs Global)", 2, 50, 15,
                                         key="umap_n_neighbors_old",
                                         help="Lower = focus on model differences. Higher = focus on global structure.")
