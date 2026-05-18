@@ -10,7 +10,7 @@ try:
 except:
     models = ["llama3:latest", "qwen:latest", "phi3:latest"]
     df = pd.DataFrame([{
-        "psychotype": np.random.choice(["Baseline","Hysteroid", "Schizoid", "Paranoid", "Epileptoid"]),
+        "archetype": np.random.choice(["Neutral","Expressive", "Detached", "Defensive", "Structured"]),
         "teacher": np.random.choice(models),
         "student": np.random.choice(models),
         "ms_per_word": np.random.uniform(100, 500),
@@ -20,14 +20,14 @@ except:
     } for _ in range(300)])
 
 # Підготовка допоміжних колонок
-df['psychotype_id'] = df['psychotype'].astype('category').cat.codes
+df['archetype_id'] = df['archetype'].astype('category').cat.codes
 
 
 def create_final_dashboard(df):
     # FIG 0: Потік логіки (Колір: Психотип)
     fig0 = px.parallel_categories(
-        df, dimensions=['teacher', 'student', 'psychotype', 'v_ok_numeric'],
-        color="psychotype_id",
+        df, dimensions=['teacher', 'student', 'archetype', 'v_ok_numeric'],
+        color="archetype_id",
         color_continuous_scale=px.colors.qualitative.Plotly,
         title="Logic Pipeline | Потік логіки (Колір: Психотип)"
     )
@@ -35,7 +35,7 @@ def create_final_dashboard(df):
 
     # FIG 1: Потік логіки (Колір: Результат)
     fig1 = px.parallel_categories(
-        df, dimensions=['teacher', 'student', 'psychotype', 'v_ok_numeric'],
+        df, dimensions=['teacher', 'student', 'archetype', 'v_ok_numeric'],
         color="v_ok_numeric", color_continuous_scale="RdYlGn",
         title="Logic Pipeline | Потік логіки (Колір: v_ok)"
     )
@@ -50,7 +50,7 @@ def create_final_dashboard(df):
     # FIG 3: 3D Взаємодія
     fig3 = px.scatter_3d(
         df, x='lexical_density', y='ms_per_word', z='cognitive_load',
-        color='psychotype', symbol='student',
+        color='archetype', symbol='student',
         title="3D Interaction | 3D Взаємодія"
     )
 

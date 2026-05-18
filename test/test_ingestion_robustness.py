@@ -47,7 +47,7 @@ def test_load_knowledge_base_error_handling(temp_knowledge_base):
 
 
 def test_metadata_integrity(temp_knowledge_base):
-    """Best Practice: Ensure psychotype label is correctly mapped from filename."""
+    """Best Practice: Ensure archetype label is correctly mapped from filename."""
     rag = RAGEngine()
     rag.load_knowledge_base(temp_knowledge_base)
 
@@ -56,13 +56,13 @@ def test_metadata_integrity(temp_knowledge_base):
 
     assert len(results) > 0
     # Ensure the engine derived 'schizoid' from 'schizoid.txt'
-    assert results[0]["psychotype"] == "schizoid"
+    assert results[0]["archetype"] == "schizoid"
     assert results[0]["domain"] == "Behavior"
 
 
 def test_retrieval_isolation_negative(temp_knowledge_base):
     """
-    Critical Test: Ensure that asking for a psychotype that exists
+    Critical Test: Ensure that asking for a archetype that exists
     returns data, but asking for one that doesn't returns an empty list
     (Isolation check).
     """
@@ -70,9 +70,9 @@ def test_retrieval_isolation_negative(temp_knowledge_base):
     rag.load_knowledge_base(temp_knowledge_base)
 
     # Request 'paranoid' but we only loaded 'schizoid'
-    results = rag.retrieve("some text", top_k=5, psychotype="paranoid")
+    results = rag.retrieve("some text", top_k=5, archetype="paranoid")
 
-    assert len(results) == 0, "Should not leak other psychotypes when a filter is applied."
+    assert len(results) == 0, "Should not leak other archetypes when a filter is applied."
 
 
 def test_chunk_granularity(temp_knowledge_base):
@@ -82,7 +82,7 @@ def test_chunk_granularity(temp_knowledge_base):
 
     # schizoid.txt had 2 valid lines
     # We use a broad query to get everything
-    all_schizoid = rag.retrieve("thinking minimalist", top_k=10, psychotype="schizoid")
+    all_schizoid = rag.retrieve("thinking minimalist", top_k=10, archetype="schizoid")
 
     assert len(all_schizoid) >= 2, "Chunker is missing lines from the source file."
 

@@ -13,7 +13,7 @@ class LabSchema(BaseModel):
     bias: str = Field(default="N/A")
     system_prompt: Optional[str] = Field(default=None)
 
-    psychotype: str
+    archetype: str
     batch_time: Optional[str] = Field(alias="batch", default=None)
     duration_ms: float = 0.0
     val: float = 0.0
@@ -73,7 +73,7 @@ class LabDataBridge:
 
         # 2. Build a flattened data structure
         flat = {
-            **raw,  # Carry over all root identifiers (student, psychotype, etc.)
+            **raw,  # Carry over all root identifiers (student, archetype, etc.)
 
             # --- NLP Metrics Extraction ---
             # Prioritize extended metrics if available, otherwise use base versions
@@ -112,8 +112,8 @@ class LabDataBridge:
         if df.empty:
             return df
 
-        # Convert strings to categories (huge memory saver for LLM names/psychotypes)
-        categorical_cols = ['student', 'psychotype', 'batch_time', 'bias']
+        # Convert strings to categories (huge memory saver for LLM names/archetypes)
+        categorical_cols = ['student', 'archetype', 'batch_time', 'bias']
         for col in categorical_cols:
             if col in df.columns:
                 df[col] = df[col].astype('category')

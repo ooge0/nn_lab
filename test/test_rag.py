@@ -11,7 +11,7 @@ Covers:
 - Ingestion correctness
 - Schema validity
 - Retrieval sanity
-- Psychotype coverage
+- Archetype coverage
 - Semantic alignment (Cosine Similarity)
 - Weighted Drift Index calculation
 """
@@ -28,15 +28,15 @@ def test_chunks_loaded(rag):
     assert len(rag.store.chunks) > 0, "RAG knowledge base is empty"
 
 
-def test_all_psychotypes_present(rag):
+def test_all_archetypes_present(rag):
     """
-    Ensure all expected psychotype categories exist in the loaded dataset.
+    Ensure all expected archetype categories exist in the loaded dataset.
     """
-    psychotypes = {c.psychotype for c in rag.store.chunks}
+    archetypes = {c.archetype for c in rag.store.chunks}
     expected = {"paranoid", "schizoid", "hysteroid", "epileptoid"}
 
-    missing = expected - psychotypes
-    assert not missing, f"Missing psychotypes in knowledge base: {missing}"
+    missing = expected - archetypes
+    assert not missing, f"Missing archetypes in knowledge base: {missing}"
 
 
 def test_valid_domains(rag):
@@ -89,24 +89,24 @@ def test_paranoid_signal_retrieval(rag):
     Semantic test: Ensure a query with strong paranoid keywords returns paranoid-tagged content.
     """
     results = rag.query("hidden motives distrust and suspicion", k=5)
-    paranoid_hits = [r for r in results if r["psychotype"] == "paranoid"]
+    paranoid_hits = [r for r in results if r["archetype"] == "paranoid"]
     assert len(paranoid_hits) > 0, "Retrieval failed to identify paranoid signals for a relevant query"
 
 
 def test_retrieval_boundary_isolation(rag):
     """
-    Isolation test: Ensure a query for 'Epileptoid' traits does not leak 'Hysteroid' content.
+    Isolation test: Ensure a query for 'Structured' traits does not leak 'Expressive' content.
     Prevents cross-contamination in the vector space.
     """
     query = "Structured order, discipline and physical control"
     results = rag.query(query, k=5)
 
-    # Top hit must be the target psychotype
-    assert results[0]["psychotype"] == "epileptoid", f"Wrong primary psychotype retrieved: {results[0]['psychotype']}"
+    # Top hit must be the target archetype
+    assert results[0]["archetype"] == "epileptoid", f"Wrong primary archetype retrieved: {results[0]['archetype']}"
 
-    # Secondary hits should not contain conflicting psychotypes
-    types_in_results = {r["psychotype"] for r in results}
-    assert "hysteroid" not in types_in_results, "Cross-contamination: Hysteroid content leaked into Epileptoid search"
+    # Secondary hits should not contain conflicting archetypes
+    types_in_results = {r["archetype"] for r in results}
+    assert "hysteroid" not in types_in_results, "Cross-contamination: Expressive content leaked into Structured search"
 
 
 def test_cosine_alignment_integrity(rag):
@@ -137,14 +137,14 @@ def test_weighted_drift_calculation():
     Validate the Drift Index formula.
     Checks if the system correctly identifies 'Out of Character' responses based on weighted attributes.
     """
-    # Attribute weights for a specific psychotype (e.g., Schizoid)
+    # Attribute weights for a specific archetype (e.g., Detached)
     weights = {
         "formality": 0.5,  # High priority
         "aggression": 0.2,  # Low priority
         "complexity": 0.3  # Medium priority
     }
 
-    # Target Baseline (The Ideal Persona)
+    # Target Neutral (The Ideal Persona)
     target = {"formality": 0.9, "aggression": 0.1, "complexity": 0.8}
 
     # Case A: Model output is close to target (Low Drift)
@@ -165,7 +165,7 @@ def test_weighted_drift_calculation():
 
 def test_retrieval_sanity_loop(rag):
     """
-    Comprehensive smoke test for a variety of psychotype queries.
+    Comprehensive smoke test for a variety of archetype queries.
     Prints retrieval details for manual inspection during debugging.
     """
     queries = [
@@ -190,10 +190,10 @@ def test_feature_correlation_consistency(rag):
 
     This detects 'Psychological Chimera'—responses where individual
     scores might seem okay, but the combination of traits is logically
-    impossible for the given psychotype.
+    impossible for the given archetype.
     """
 
-    # 1. Baseline: Establish the 'Ground Truth' correlation matrix.
+    # 1. Neutral: Establish the 'Ground Truth' correlation matrix.
     # In a production environment, this data is pulled directly from your RAG knowledge base.
     # Example for 'Histeroid': High emotionality and attention-seeking should correlate positively,
     # while logical consistency usually correlates negatively with dramatic exaggeration.

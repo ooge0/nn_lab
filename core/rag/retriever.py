@@ -45,7 +45,7 @@ class Retriever:
         context_lines = []
 
         for r in results:
-            line = f"[{r['psychotype']} | {r['domain']}] {r['content']}"
+            line = f"[{r['archetype']} | {r['domain']}] {r['content']}"
             context_lines.append(line)
 
         return "\n".join(context_lines)

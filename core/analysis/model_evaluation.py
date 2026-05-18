@@ -27,7 +27,7 @@ class ModelEvaluation:
         - hallucination
         - truthful_response
         - anomaly
-        - psychotype
+        - archetype
     """
 
     def __init__(self, target_column="label"):

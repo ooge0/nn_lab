@@ -13,7 +13,7 @@ def sample_row_data():
     return {
         "student": "qwen:latest",
         "teacher": "llama3:latest",
-        "psychotype": "Epileptoid",
+        "archetype": "Structured",
         "word_count": 259,
         "unique_ratio": 0.68,
         "ms_per_word": 145.32,
@@ -85,7 +85,7 @@ def test_alias_regression_check():
     data = {
         "student": "test_bot",
         "teacher": "test_judge",
-        "psychotype": "Schizoid",
+        "archetype": "Detached",
         "neuro_self_focus": 0.99,
         "self_focus": 0.00
     }

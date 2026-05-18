@@ -9,20 +9,20 @@ def get_high_dim_dashboard(df_input):
     """
     # Preparation for Parallel Categories (Codes for color scaling)
     df_plot = df_input.copy()
-    if 'psychotype' in df_plot.columns:
-        df_plot['psychotype_id'] = df_plot['psychotype'].astype('category').cat.codes
+    if 'archetype' in df_plot.columns:
+        df_plot['archetype_id'] = df_plot['archetype'].astype('category').cat.codes
 
-    # FIG 0: Logic Pipeline (Color: Psychotype)
+    # FIG 0: Logic Pipeline (Color: Archetype)
     fig0 = px.parallel_categories(
-        df_plot, dimensions=['teacher', 'student', 'psychotype', 'v_ok_numeric'],
-        color="psychotype_id", color_continuous_scale=px.colors.qualitative.Plotly,
-        title="Logic Pipeline | Color: Psychotype"
+        df_plot, dimensions=['teacher', 'student', 'archetype', 'v_ok_numeric'],
+        color="archetype_id", color_continuous_scale=px.colors.qualitative.Plotly,
+        title="Logic Pipeline | Color: Archetype"
     )
     fig0.update_layout(coloraxis_showscale=False)
 
     # FIG 1: Logic Pipeline (Color: Validation Result)
     fig1 = px.parallel_categories(
-        df_plot, dimensions=['teacher', 'student', 'psychotype', 'v_ok_numeric'],
+        df_plot, dimensions=['teacher', 'student', 'archetype', 'v_ok_numeric'],
         color="v_ok_numeric", color_continuous_scale="RdYlGn",
         title="Logic Pipeline | Color: v_ok (Success)"
     )

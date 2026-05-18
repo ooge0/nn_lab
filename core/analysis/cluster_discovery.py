@@ -60,7 +60,7 @@ class ClusterDiscovery:
         """Generates the interactive Plotly scatter plot."""
         fig = px.scatter(
             df, x='x', y='y', color='cluster_id',
-            title="Psychotype Clustering (PCA Reduction)",
+            title="Archetype Clustering (PCA Reduction)",
             labels={'x': 'Principal Component 1', 'y': 'Principal Component 2'},
             hover_data=df.select_dtypes(include=['object']).columns  # Show text data on hover
         )

@@ -15,16 +15,16 @@ class Chunk:
     Represents a single atomic knowledge unit for RAG.
 
     Attributes:
-        psychotype: target psychotype label (e.g. paranoid, schizoid)
+        archetype: target archetype label (e.g. paranoid, schizoid)
         domain: semantic domain (behavior, speech, cognition, trigger, emotion)
         content: atomic statement used for embedding
     """
-    psychotype: str
+    archetype: str
     domain: str
     content: str
 
 
-def parse_txt_file(file_path: str, psychotype: str) -> List[Chunk]:
+def parse_txt_file(file_path: str, archetype: str) -> List[Chunk]:
     chunks = []
     with open(file_path, "r", encoding="utf-8") as f:
         for line in f:
@@ -51,7 +51,7 @@ def parse_txt_file(file_path: str, psychotype: str) -> List[Chunk]:
 
                 chunks.append(
                     Chunk(
-                        psychotype=psychotype,
+                        archetype=archetype,
                         domain=domain_val,
                         content=content_val
                     )

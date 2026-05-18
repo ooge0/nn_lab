@@ -2,28 +2,28 @@
 
 def test_filtered_semantic_retrieval_old(rag):
     """
-    Test that filtering correctly isolates the target psychotype
+    Test that filtering correctly isolates the target archetype
     even when 'baseline' has similar semantic content.
     """
     query_text = "conceptual focus and low social engagement"
 
-    # Pass the psychotype filter explicitly
-    results = rag.retrieve(text=query_text, top_k=3, psychotype="schizoid")
+    # Pass the archetype filter explicitly
+    results = rag.retrieve(text=query_text, top_k=3, archetype="schizoid")
 
     assert len(results) > 0
-    assert results[0]["psychotype"] == "schizoid", "Filter failed to isolate schizoid"
+    assert results[0]["archetype"] == "schizoid", "Filter failed to isolate schizoid"
     assert "conceptual" in results[0]["content"].lower() or "abstract" in results[0]["content"].lower()
 
 
 def test_filtered_semantic_retrieval(rag):
     query_text = "conceptual focus and low social engagement"
-    results = rag.retrieve(text=query_text, top_k=3, psychotype="schizoid")
+    results = rag.retrieve(text=query_text, top_k=3, archetype="schizoid")
 
     assert len(results) > 0
     hit = results[0]
 
     # Verify metadata
-    assert hit["psychotype"] == "schizoid"
+    assert hit["archetype"] == "schizoid"
 
     # Verify content relevance using keywords instead of exact string
     content = hit["content"].lower()
@@ -38,8 +38,8 @@ def test_unfiltered_retrieval_ranking(rag):
     """
     results = rag.retrieve("conceptual focus", top_k=1)
     # This helps you see if your embeddings are 'too flat'
-    # (i.e., different psychotypes look too similar to the model)
-    print(f"Top unfiltered hit: {results[0]['psychotype']} -> {results[0]['content']}")
+    # (i.e., different archetypes look too similar to the model)
+    print(f"Top unfiltered hit: {results[0]['archetype']} -> {results[0]['content']}")
 
 
 def test_empty_query_handling(rag):

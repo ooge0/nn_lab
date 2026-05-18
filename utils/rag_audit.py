@@ -22,11 +22,11 @@ def analyze_chunks(rag: RAGEngine):
     # -------------------------
     print(f"Total chunks: {len(chunks)}")
 
-    psychotype_counts = Counter([c.psychotype for c in chunks])
+    archetype_counts = Counter([c.archetype for c in chunks])
     domain_counts = Counter([c.domain for c in chunks])
 
-    print("\n-- Psychotype distribution --")
-    for k, v in psychotype_counts.items():
+    print("\n-- Archetype distribution --")
+    for k, v in archetype_counts.items():
         print(f"{k}: {v}")
 
     print("\n-- Domain distribution --")
@@ -64,7 +64,7 @@ def analyze_chunks(rag: RAGEngine):
     # -------------------------
     print("\n-- Sample chunks --")
     for c in chunks[:5]:
-        print(f"[{c.psychotype} | {c.domain}] {c.content}")
+        print(f"[{c.archetype} | {c.domain}] {c.content}")
 
 
 def test_retrieval(rag: RAGEngine):
@@ -83,7 +83,7 @@ def test_retrieval(rag: RAGEngine):
         print(f"\nQuery: {q}")
 
         for r in results:
-            print(f" -> {r['psychotype']} | {r['domain']} | {r['content'][:80]}")
+            print(f" -> {r['archetype']} | {r['domain']} | {r['content'][:80]}")
 
 
 if __name__ == "__main__":

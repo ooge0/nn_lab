@@ -15,7 +15,7 @@ def load_chunks(folder_path):
         if not file_name.endswith(".txt"):
             continue
 
-        psychotype = file_name.replace(".txt", "")
+        archetype = file_name.replace(".txt", "")
         with open(os.path.join(folder_path, file_name), "r", encoding="utf-8") as f:
             text = f.read()
 
@@ -26,7 +26,7 @@ def load_chunks(folder_path):
         total = len(chunks)
         for i, c in enumerate(chunks):
             data.append({
-                "psychotype": psychotype,
+                "archetype": archetype,
                 "text": c,
                 "chunk_index": i,
                 "progress": i / total if total > 1 else 0
@@ -62,24 +62,24 @@ def plot_with_dynamics(df, coords):
 
     # PLOT 1: Scatter plot (Spatial distribution)
     fig1 = px.scatter(
-        df, x="x", y="y", color="psychotype",
+        df, x="x", y="y", color="archetype",
         hover_data=["text"],
         title="1. Embedding Space Map (Clusters)"
     )
     fig1.show()
 
     # PLOT 2: Violin + Box Plot (Analysis of deviations and variance)
-    # This clearly shows outliers and the spread of each psychotype
+    # This clearly shows outliers and the spread of each archetype
     fig2 = px.violin(
         df,
         y="x",
-        x="psychotype",
-        color="psychotype",
+        x="archetype",
+        color="archetype",
         box=True,  # Show box plot inside violin
         points="all",  # Show all points to see outliers clearly
         hover_data=["text", "progress"],
-        title="2. Deviation Analysis: Psychotype Variance & Outliers (PCA 1)",
-        labels={"x": "Semantic Value (PCA Axis 1)", "psychotype": "Psychotype"}
+        title="2. Deviation Analysis: Archetype Variance & Outliers (PCA 1)",
+        labels={"x": "Semantic Value (PCA Axis 1)", "archetype": "Archetype"}
     )
     fig2.show()
 
@@ -88,7 +88,7 @@ def plot_with_dynamics(df, coords):
         df,
         x="progress",
         y="x",
-        color="psychotype",
+        color="archetype",
         hover_data=["text"],
         title="3. Narrative Dynamics (Vector drift from start to end)",
         labels={"progress": "File Start ———> File End", "x": "Semantic Vector (PCA 1)"}

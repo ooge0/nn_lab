@@ -16,6 +16,7 @@ from loguru import logger
 from openai import OpenAI
 
 from core.rag.ingestion import RAGEngine
+from core.analysis.model_evaluation import ModelEvaluation
 from tmp.simple_plotty_staff import get_high_dim_dashboard
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -144,12 +145,12 @@ if "pull_logs" not in st.session_state:
 if "pull_running" not in st.session_state:
     st.session_state.pull_running = False
 
-PSYCHOTYPES = {
-    "Baseline": "Balanced, polite, task-oriented, and objective communication without emotional or structural extremes.",
-    "Hysteroid": "Theatrical, egocentric, focus on external effect.",
-    "Paranoid": "Suspicious, focus on hidden threats and logic.",
-    "Schizoid": "Emotional coldness, focus on abstract concepts.",
-    "Epileptoid": "Focus on order, rules, meticulously aggressive."
+ARCHETYPES = {
+    "Neutral": "Balanced, polite, task-oriented, and objective communication without emotional or structural extremes.",
+    "Expressive": "Theatrical, egocentric, focus on external effect.",
+    "Defensive": "Suspicious, focus on hidden threats and logic.",
+    "Detached": "Emotional coldness, focus on abstract concepts.",
+    "Structured": "Focus on order, rules, meticulously aggressive."
 }
 
 
@@ -229,9 +230,9 @@ with st.sidebar.expander("📊 Modes and statuses", expanded=st.session_state["o
     # Mode 1: Self-Critic (SC)
     if col_db1.button("Mode: SC", width='stretch'):
         st.session_state["self_critic"] = True
-        st.session_state["prompt_strategy"] = "Expert Psychologist (Tuned)"
+        st.session_state["prompt_strategy"] = "Behavioral conditioning (Tuned)"
         st.session_state["model_select"] = ["qwen:latest"]
-        st.session_state["selected_psychotypes"] = ["Schizoid"]
+        st.session_state["selected_archetypes"] = ["Detached"]
         st.session_state["current_sweep"] = "None"
         st.session_state["split_biases"] = False
         st.session_state["exclude_from_prompt"] = False
@@ -243,10 +244,10 @@ with st.sidebar.expander("📊 Modes and statuses", expanded=st.session_state["o
     # Mode 2: Teacher-Student
     if col_db2.button("Mode: T-S", width='stretch'):
         st.session_state["self_critic"] = False
-        st.session_state["prompt_strategy"] = "Expert Psychologist (Tuned)"
+        st.session_state["prompt_strategy"] = "Behavioral conditioning (Tuned)"
         st.session_state["model_select"] = ["qwen:latest"]
         st.session_state["teacher_model_key"] = "llama3:latest"
-        st.session_state["selected_psychotypes"] = ["Schizoid"]
+        st.session_state["selected_archetypes"] = ["Detached"]
         st.session_state["current_sweep"] = "None"
         st.session_state["split_biases"] = False
         st.session_state["exclude_from_prompt"] = False
@@ -259,7 +260,7 @@ with st.sidebar.expander("📊 Modes and statuses", expanded=st.session_state["o
 #
 # ============================================================
 st.sidebar.title("🧪 Lab controls")
-with st.sidebar.expander("📊 Baseline parameters", expanded=st.session_state["open_debug"]):
+with st.sidebar.expander("📊 Neutral parameters", expanded=st.session_state["open_debug"]):
     base_temp = st.slider("Temperature", 0.0, 2.0, 0.3, 0.1)
     base_top_p = st.slider("Top P", 0.0, 1.0, 0.9, 0.05)
     base_freq = st.slider("Frequency penalty", -2.0, 2.0, 1.1, 0.1)
@@ -450,24 +451,24 @@ def render_console():
 
 
 # ============================================================
-# PSYCHOTYPES
+# ARCHETYPES
 # ============================================================
 
-PSYCHOTYPES = {
+ARCHETYPES = {
 
-    "Hysteroid":
+    "Expressive":
         "Theatrical, egocentric, emotional amplification, dramatic expression.",
 
-    "Paranoid":
+    "Defensive":
         "Suspicious, threat-focused, defensive logic, distrustful reasoning.",
 
-    "Schizoid":
+    "Detached":
         "Emotionally detached, abstract, low social engagement, conceptual focus.",
 
-    "Epileptoid":
+    "Structured":
         "Order-focused, rigid, structured, control-oriented communication.",
 
-    "Baseline":
+    "Neutral":
         "Balanced, objective, emotionally neutral, polite and task-oriented."
 }
 
@@ -514,7 +515,7 @@ with tab_gen:
         # 3. Render the remaining radio options in column 1
         prompt_strategy = c1.radio(
             "Prompt strategy",
-            ["Expert Psychologist (Tuned)", "Blind mode (Hide label)", "Raw / No system prompt"],
+            ["Behavioral conditioning (Tuned)", "Blind mode (Hide label)", "Raw / No system prompt"],
             key="prompt_strategy"
         )
 
@@ -555,8 +556,8 @@ with tab_gen:
         rag_mode = r3.selectbox(
             "Mode",
             [
-                "Psychotype Only",
-                "Psychotype + Bias",
+                "Archetype Only",
+                "Archetype + Bias",
                 "Global"
             ],
             disabled=not rag_enabled
@@ -689,11 +690,11 @@ with tab_gen:
     with st.expander("Experiment data", expanded=st.session_state.exp_expanded):
         c_in, c_out = st.columns(2)
         with c_in:
-            # 5. Psychotypes (Synced to st.session_state["selected_psychotypes"])
-            selected_psychotypes = st.multiselect(
-                "Psychotypes",
-                list(PSYCHOTYPES.keys()),
-                key="selected_psychotypes"
+            # 5. Archetypes (Synced to st.session_state["selected_archetypes"])
+            selected_archetypes = st.multiselect(
+                "Archetypes",
+                list(ARCHETYPES.keys()),
+                key="selected_archetypes"
             )
 
             target_biases_raw = st.text_input(
@@ -720,7 +721,7 @@ with tab_gen:
             )
 
             exclude_from_prompt = st.checkbox(
-                "Exclude psychotype from prompt",
+                "Exclude archetype from prompt",
                 value=mask_disabled,
                 disabled=mask_disabled
             )
@@ -729,26 +730,26 @@ with tab_gen:
             # SYSTEM PROMPT PREVIEW
             # ------------------------------------------------
 
-            if selected_psychotypes:
+            if selected_archetypes:
 
                 display_names = (
                     "[HIDDEN]"
                     if exclude_from_prompt
-                    else ", ".join(selected_psychotypes)
+                    else ", ".join(selected_archetypes)
                 )
 
-                if prompt_strategy == "Expert Psychologist (Tuned)":
+                if prompt_strategy == "Behavioral conditioning (Tuned)":
 
                     default_prompt = (
-                        f"Act as psychologist. "
-                        f"Rewrite to the {display_names} psychotype(s). "
+                        f"Act as Behavioral conditioning. "
+                        f"Rewrite to the {display_names} archetype(s). "
                         f"Return JSON with 'text' key."
                     )
 
                 elif prompt_strategy == "Blind mode (Hide label)":
 
                     default_prompt = (
-                        "Act as psychologist. "
+                        "Act as Behavioral conditioning. "
                         "Rewrite using personality traits. "
                         "Return JSON with 'text' key."
                     )
@@ -771,8 +772,8 @@ with tab_gen:
 
             missing_params = []
 
-            if not selected_psychotypes:
-                missing_params.append("Psychotypes")
+            if not selected_archetypes:
+                missing_params.append("Archetypes")
 
             if not student_models:
                 missing_params.append("Students")
@@ -894,7 +895,7 @@ with tab_gen:
                     *
                     len(biases)
                     *
-                    len(selected_psychotypes)
+                    len(selected_archetypes)
                     *
                     len(val_range)
             )
@@ -905,7 +906,7 @@ with tab_gen:
             # MAIN NESTED LOOPS
             # =================================================
 
-            for current_type in selected_psychotypes:
+            for current_type in selected_archetypes:
 
                 if st.session_state.stop_requested:
                     break
@@ -917,15 +918,15 @@ with tab_gen:
                 if prompt_strategy == "Raw / No system prompt":
 
                     iter_sys_prompt = (
-                        PSYCHOTYPES[current_type]
+                        ARCHETYPES[current_type]
                     )
-
+                
                 elif prompt_strategy == "Blind mode (Hide label)":
 
                     iter_sys_prompt = (
                         "Act as psychologist. "
                         f"Rewrite using traits: "
-                        f"{PSYCHOTYPES[current_type]}. "
+                        f"{ARCHETYPES[current_type]}. "
                         "Return JSON with 'text' key."
                     )
 
@@ -936,7 +937,7 @@ with tab_gen:
                         iter_sys_prompt = (
                             "Act as psychologist. "
                             f"Rewrite using traits: "
-                            f"{PSYCHOTYPES[current_type]}. "
+                            f"{ARCHETYPES[current_type]}. "
                             "Return JSON with 'text' key."
                         )
 
@@ -945,8 +946,8 @@ with tab_gen:
                         iter_sys_prompt = (
                             "Act as psychologist. "
                             f"Rewrite to the "
-                            f"{current_type} psychotype: "
-                            f"{PSYCHOTYPES[current_type]}. "
+                            f"{current_type} archetype: "
+                            f"{ARCHETYPES[current_type]}. "
                             "Return JSON with 'text' key."
                         )
 
@@ -1035,11 +1036,11 @@ with tab_gen:
                                         st.session_state.rag_engine
                                 ):
 
-                                    if rag_mode == "Psychotype Only":
+                                    if rag_mode == "Archetype Only":
 
                                         rag_query = current_type
 
-                                    elif rag_mode == "Psychotype + Bias":
+                                    elif rag_mode == "Archetype + Bias":
 
                                         rag_query = (
                                             f"{current_type} "
@@ -1061,7 +1062,7 @@ with tab_gen:
 
                                     rag_context = "\n\n".join([
                                         (
-                                            f"[{x['psychotype']} | "
+                                            f"[{x['archetype']} | "
                                             f"{x['category']}]\n"
                                             f"{x['text']}"
                                         )
@@ -1082,7 +1083,7 @@ REFERENCE KNOWLEDGE:
 {rag_context}
 
 INSTRUCTION:
-Generate response using retrieved psychotype information.
+Generate response using retrieved archetype information.
 """
 
                                 else:
@@ -1223,7 +1224,7 @@ Generate response using retrieved psychotype information.
                                             f"{st.session_state.total_tasks}"
                                         ),
                                     "strategy": prompt_strategy,
-                                    "psychotype": current_type,
+                                    "archetype": current_type,
                                     "split_bias_mode": bool(st.session_state.get("split_biases", False)),
                                     "bias": b_item,
                                     "system_prompt": iter_sys_prompt,
@@ -1348,7 +1349,7 @@ with tab_perf:
 
         # 3. Strategy & Logic
         prompt_strategy = df['strategy'].unique().tolist()
-        psychotypes_list = df['psychotype'].unique().tolist()
+        archetypes_list = df['archetype'].unique().tolist()
         bias_mode = df['bias'].unique().tolist()
 
         # 4. RAG Status
@@ -1368,7 +1369,7 @@ with tab_perf:
                 "teacher",
                 "student(s)",
                 "Prompt strategy",
-                "Psychotypes",
+                "Archetypes",
                 "Biases",
                 "Split bias mode",
                 "RAG enabled",
@@ -1385,7 +1386,7 @@ with tab_perf:
                 ", ".join(teachers),
                 ", ".join(students),
                 ", ".join(map(str, prompt_strategy)),
-                ", ".join(map(str, psychotypes_list)),
+                ", ".join(map(str, archetypes_list)),
                 ", ".join(map(str, bias_mode)),
                 "✅ Enabled" if st.session_state.get("split_biases", False) else "❌ Disabled",
                 "✅ Yes" if rag_active else "❌ No",
@@ -1497,7 +1498,7 @@ with tab_analytics:
             st.divider()
             st.subheader("🎭 Psycholinguistic Signature")
             st.plotly_chart(
-                px.scatter(df, x="punc_density", y="expansion_ratio", color="psychotype", symbol="student",
+                px.scatter(df, x="punc_density", y="expansion_ratio", color="archetype", symbol="student",
                            size="word_count", title="Style Distribution (Raw Space)", template="plotly_dark"),
                 width='stretch'
             )
@@ -1540,11 +1541,11 @@ with tab_analytics:
                     width='stretch'
                 )
 
-                # By psychotype
-                if "psychotype" in df.columns:
+                # By archetype
+                if "archetype" in df.columns:
                     st.plotly_chart(
-                        px.bar(df, x="psychotype", y="zipf_deviation", color="student",
-                               barmode="group", title="Zipf Deviation by Psychotype",
+                        px.bar(df, x="archetype", y="zipf_deviation", color="student",
+                               barmode="group", title="Zipf Deviation by archetype",
                                template="plotly_dark"),
                         width='stretch'
                     )
@@ -1579,22 +1580,22 @@ with tab_nlp:
                 a="pos_adj",
                 b="pos_noun",
                 c="pos_verb",
-                color="psychotype",
+                color="archetype",
                 size="word_count",
                 title="POS Morphology Profile"
             ), width='stretch')
 
-            # --- Row 2: Psychotype Proofs ---
+            # --- Row 2: Archetype Proofs ---
             st.divider()
             col_a, col_b = st.columns(2)
 
             with col_a:
                 st.write(
                     "**Cognitive Complexity (Readability vs Diversity)**")
-                # Schizoids usually cluster top-right (High ARI, High TTR)
+                # Detacheds usually cluster top-right (High ARI, High TTR)
                 st.plotly_chart(px.scatter(
                     full_df, x="readability_ari", y="corrected_ttr",
-                    color="psychotype", symbol="student", size="word_count",
+                    color="archetype", symbol="student", size="word_count",
                     title="Intelligence & Vocabulary Breadth"
                 ), width='stretch')
 
@@ -1603,7 +1604,7 @@ with tab_nlp:
                     "**Emotional Engagement (Subjectivity vs Sentiment)** ")
                 st.plotly_chart(px.scatter(
                     full_df, x="subjectivity", y="sentiment",
-                    color="psychotype",
+                    color="archetype",
                     symbol="student",
                     size="lexical_density",
                     facet_col="bias",
@@ -1622,11 +1623,11 @@ with tab_nlp:
 
                 st.plotly_chart(px.box(
                     full_df,
-                    x="psychotype",
+                    x="archetype",
                     y="sentiment_variance",
-                    color="psychotype",
+                    color="archetype",
                     points="all",
-                    title="Emotional Variability per Psychotype"
+                    title="Emotional Variability per archetype"
                 ), width='stretch')
 
             with col_d:
@@ -1635,7 +1636,7 @@ with tab_nlp:
                     full_df,
                     x="bias",
                     y="repetition_score",
-                    color="psychotype",
+                    color="archetype",
                     points="all",
                     notched=True,
                     title="Repetition Triggered by Bias Type"
@@ -1645,8 +1646,8 @@ with tab_nlp:
             st.write(
                 "**Syntactic Flow (Sentence Length Distribution)**")
             st.plotly_chart(px.box(
-                full_df, x="psychotype", y="avg_sentence_length",
-                color="psychotype", points="all", title="Sentence Length per Psychotype"
+                full_df, x="archetype", y="avg_sentence_length",
+                color="archetype", points="all", title="Sentence Length per archetype"
             ), width='stretch')
 
             # --- Row 5: Neuropsychological Metrics ---
@@ -1658,13 +1659,13 @@ with tab_nlp:
                     full_df,
                     x="neuro_self_focus",
                     y="rigidity",
-                    color="psychotype",
+                    color="archetype",
                     size="word_count",
                     # This is your Alias mapping
                     labels={
                         "neuro_self_focus": "Self-Reference (I-Factor)",
                         "rigidity": "Cognitive Rigidity (Fixation)",
-                        "psychotype": "Psychotype Cluster"
+                        "archetype": "Archetype Cluster"
                     },
                     hover_data=["bias", "student"],
                     title="Egocentricity vs Fixation"
@@ -1677,14 +1678,14 @@ with tab_nlp:
                     full_df,
                     x="neuro_self_focus",
                     y="rigidity",
-                    color="psychotype",
+                    color="archetype",
                     facet_col="bias",
                     size="word_count",
                     hover_data=["student", "val"],
                     labels={
                         "neuro_self_focus": "I-Factor",
                         "rigidity": "Cognitive Rigidity (Fixation)",
-                        "psychotype": "Psychotype Cluster"
+                        "archetype": "Archetype Cluster"
                     },
                     title="Egocentricity vs Fixation by Input Bias"
                 ), width='stretch')
@@ -1697,7 +1698,7 @@ with tab_nlp:
                     full_df,
                     x="bias",
                     y="rigidity",
-                    color="psychotype",
+                    color="archetype",
                     points="all",
                     notched=True,
                     title="Linguistic Rigidity: Impact of Bias",
@@ -1710,7 +1711,7 @@ with tab_nlp:
                     full_df,
                     x="neuro_abstract_ratio_ext",
                     y="neuro_cognitive_load",
-                    color="psychotype",
+                    color="archetype",
                     size="word_count",
                     title="Abstract Thinking vs Processing Load",
                     hover_data="student",
@@ -1725,11 +1726,11 @@ with tab_nlp:
                 st.write("**Narrative Coherence Distribution** ")
                 st.plotly_chart(px.box(
                     full_df,
-                    x="psychotype",
+                    x="archetype",
                     y="neuro_coherence",
-                    color="psychotype",
+                    color="archetype",
                     points="all",
-                    title="Logical Continuity per Psychotype",
+                    title="Logical Continuity per archetype",
                     hover_data="student",
                 ), width='stretch')
 
@@ -1738,11 +1739,11 @@ with tab_nlp:
                     "**Emotional Volatility (Sentence Variance)**")
                 st.plotly_chart(px.box(
                     full_df,
-                    x="psychotype",
+                    x="archetype",
                     y="sentiment_variance",
-                    color="psychotype",
+                    color="archetype",
                     points="all",
-                    title="Emotional Stability per Psychotype",
+                    title="Emotional Stability per archetype",
                     hover_data="student",
                 ), width='stretch')
     else:
@@ -1768,9 +1769,9 @@ with tab_clusters:
             with c2:
                 # Allow user to toggle colors between Ground Truth and K-Means Clusters
                 color_target = st.radio(
-                    "Color Points By:", ["psychotype", "cluster_id", "student", "v_ok"],
+                    "Color Points By:", ["archetype", "cluster_id", "student", "v_ok"],
                     horizontal=True,
-                    help="Switch between actual psychotypes or machine-discovered clusters."
+                    help="Switch between actual archetypes or machine-discovered clusters."
                 )
 
             # Load and Clean Data
@@ -1797,8 +1798,8 @@ with tab_clusters:
                     x='x', y='y',
                     color=color_target,
                     symbol='student',
-                    hover_data=['psychotype', 'bias', 'val', 'v_ok'],
-                    title=f"PCA Space: {color_target.capitalize()} Distribution",
+                    hover_data=['archetype', 'bias', 'val', 'v_ok'],
+                    title=f"PCA Space: {color_target.capitalize()} distribution",
                     template="plotly_dark",
                     color_discrete_sequence=px.colors.qualitative.Vivid
                 )
@@ -1835,13 +1836,13 @@ with tab_clusters:
 
                 # 4. Cluster Purity & Mapping
                 st.write("### 🧩 Cluster Purity (Ground Truth Mapping)")
-                if 'psychotype' in df_clustered.columns:
+                if 'archetype' in df_clustered.columns:
                     purity_df = pd.crosstab(
                         df_clustered['cluster_id'],
-                        df_clustered['psychotype'],
+                        df_clustered['archetype'],
                         normalize='index'
                     ) * 100
-                    st.caption("Percentage of each Psychotype present within the machine-discovered Clusters:")
+                    st.caption("Percentage of each Archetype present within the machine-discovered Clusters:")
                     st.dataframe(
                         purity_df.style.background_gradient(axis=1, cmap='YlGnBu').format("{:.1f}%"),
                         width='stretch'
@@ -1894,7 +1895,7 @@ with tab_clusters:
                         color='Cluster Name',
                         symbol='student',
                         title="HDBSCAN: Density-Based Groups",
-                        hover_data=['psychotype', 'bias'],
+                        hover_data=['archetype', 'bias'],
                         color_discrete_map={'Noise': '#7f8c8d'},
                         template="plotly_dark"
                     )
@@ -1907,8 +1908,8 @@ with tab_clusters:
                     # --- 1. Coloring Option ---
                     mst_color_mode = st.selectbox(
                         "Color MST Nodes by:",
-                        ["Default (Density)", "Student Model", "Psychotype"],
-                        help="Identify if specific models or psychotypes form isolated branches."
+                        ["Default (Density)", "Student Model", "Archetype"],
+                        help="Identify if specific models or archetypes form isolated branches."
                     )
 
                     fig_mst, ax_mst = plt.subplots(figsize=(12, 8))
@@ -1931,7 +1932,7 @@ with tab_clusters:
 
                     color_map_cols = {
                         "Student Model": "student",
-                        "Psychotype": "psychotype"
+                        "Archetype": "archetype"
                     }
 
                     if mst_color_mode != "Default (Density)":
@@ -1966,25 +1967,25 @@ with tab_clusters:
                     # 1. Selection for Contrast Mode
                     c_col1, c_col2 = st.columns([1, 2])
                     with c_col1:
-                        use_contrast = st.toggle("Enable Contrast Mode", help="Compare outliers to psychotype averages")
+                        use_contrast = st.toggle("Enable Contrast Mode", help="Compare outliers to archetype averages")
 
                     # Identify numeric metrics for comparison (excluding coordinates)
                     metric_cols = [c for c in clean_numeric.columns if c not in ['x', 'y', 'cluster_id']]
 
                     if use_contrast:
-                        # Calculate Benchmarks (Global means per Psychotype)
-                        benchmarks = df_clustered.groupby('psychotype')[metric_cols].mean()
+                        # Calculate Benchmarks (Global means per archetype)
+                        benchmarks = df_clustered.groupby('archetype')[metric_cols].mean()
 
                         # Select a specific outlier to inspect
                         selected_idx = st.selectbox(
                             "Select Outlier to Contrast:",
                             outlier_df.index,
                             format_func=lambda
-                                x: f"ID: {x} | {outlier_df.loc[x, 'student']} | {outlier_df.loc[x, 'psychotype']}"
+                                x: f"ID: {x} | {outlier_df.loc[x, 'student']} | {outlier_df.loc[x, 'archetype']}"
                         )
 
                         target_row = outlier_df.loc[selected_idx]
-                        target_psych = target_row['psychotype']
+                        target_psych = target_row['archetype']
 
                         # 2. Build Comparison Table
                         st.write(f"**Contrast: Outlier vs. {target_psych} Average**")
@@ -1997,7 +1998,7 @@ with tab_clusters:
                             comparison_data.append({
                                 "Metric": m,
                                 "Outlier Value": round(actual, 3),
-                                "Psychotype Avg": round(ref, 3),
+                                "Archetype Avg": round(ref, 3),
                                 "Delta": round(diff, 3),
                                 "Deviation %": round((diff / ref * 100), 1) if ref != 0 else 0
                             })
@@ -2012,14 +2013,14 @@ with tab_clusters:
 
                     # 3. General Outlier Feed
                     st.write("**Full Outlier Datafeed:**")
-                    display_cols = ['student', 'psychotype', 'bias', 'val', 'v_ok', 'output']
+                    display_cols = ['student', 'archetype', 'bias', 'val', 'v_ok', 'output']
                     # st.dataframe(
                     #     outlier_df[display_cols].style.background_gradient(subset=['v_ok'], cmap='RdYlGn'),
                     #     width='stretch',
                     #     height=300
                     # )
                     st.dataframe(
-                        outlier_df[['student', 'psychotype', 'step', 'output', 'v_ok']].astype(object),
+                        outlier_df[['student', 'archetype', 'step', 'output', 'v_ok']].astype(object),
                         width='stretch'
                     )
 
@@ -2070,7 +2071,7 @@ with tab_clusters:
                     st.markdown("**Visuals**")
                     mst_color_mode = st.selectbox(
                         "Color Nodes By:",
-                        ["Default (Density)", "Student Model", "Psychotype"],
+                        ["Default (Density)", "Student Model", "Archetype"],
                         key="umap_v3_color"
                     )
 
@@ -2114,10 +2115,10 @@ with tab_clusters:
                         v_tab1, v_tab2 = st.tabs(["Scatter Map", "Minimum Spanning Tree"])
                         with v_tab1:
                             color_col = "Cluster Name" if mst_color_mode == "Default (Density)" else (
-                                "student" if mst_color_mode == "Student Model" else "psychotype"
+                                "student" if mst_color_mode == "Student Model" else "archetype"
                             )
                             fig = px.scatter(df_hdb, x='x_umap', y='y_umap', color=color_col, symbol='student',
-                                             hover_data=['psychotype', 'bias', 'step', 'output'],
+                                             hover_data=['archetype', 'bias', 'step', 'output'],
                                              template="plotly_dark", title="UMAP Space")
                             st.plotly_chart(fig, width='stretch')
 
@@ -2134,7 +2135,7 @@ with tab_clusters:
                             else:
                                 st.warning("Dataset too small for MST projection (need >32 samples).")
 
-                            target_col = "student" if mst_color_mode == "Student Model" else "psychotype"
+                            target_col = "student" if mst_color_mode == "Student Model" else "archetype"
                             if mst_color_mode != "Default (Density)" and target_col in df_hdb.columns:
                                 for val in df_hdb[target_col].unique():
                                     m = df_hdb[target_col] == val
@@ -2143,7 +2144,7 @@ with tab_clusters:
                                 ax_mst.legend(facecolor='#0e1117', labelcolor='white')
                             else:
                                 # Create a mask for outliers identified by HDBSCAN (labeled as -1)
-                                # These are points that don't fit well into any specific psychotype cluster
+                                # These are points that don't fit well into any specific archetype cluster
                                 m_noise = df_hdb[target_col] == -1
 
                                 # Plot noise as small, semi-transparent gray dots to keep focus on main clusters
@@ -2164,7 +2165,7 @@ with tab_clusters:
 
                         sil_score = silhouette_score(scaled_data, hdb_labels) if len(set(hdb_labels)) > 1 else 0
                         dbi_score = davies_bouldin_score(scaled_data, hdb_labels) if len(set(hdb_labels)) > 1 else 99
-                        ari_score = adjusted_rand_score(df_hdb['psychotype'], hdb_labels)
+                        ari_score = adjusted_rand_score(df_hdb['archetype'], hdb_labels)
 
                         fit_col1.metric("CFI (Silhouette)", f"{sil_score:.3f}",
                                         delta="Good" if sil_score > 0.4 else "Weak")
@@ -2190,7 +2191,7 @@ with tab_clusters:
                                                                key="v3_anom_sel")
                                     target_row = outlier_df.loc[selected_id]
                                     if use_contrast:
-                                        benchmarks = df_hdb[df_hdb['psychotype'] == target_row['psychotype']][
+                                        benchmarks = df_hdb[df_hdb['archetype'] == target_row['archetype']][
                                             features].median()
                                         comp = [{"Metric": m, "Outlier": round(target_row[m], 3),
                                                  "Median": round(benchmarks[m], 3),
@@ -2198,12 +2199,12 @@ with tab_clusters:
                                         st.table(pd.DataFrame(comp).set_index("Metric").T)
                                     else:
                                         st.write(
-                                            f"**Persona:** {target_row['psychotype']} | **Model:** {target_row['student']}")
+                                            f"**Persona:** {target_row['archetype']} | **Model:** {target_row['student']}")
                                         st.info(f"**Output:** {target_row['output']}")
                             ##############
                             with st.expander("📋 Full Outlier Datafeed", expanded=False):
                                 st.dataframe(
-                                    outlier_df[['student', 'psychotype', 'step', 'output', 'v_ok']].astype(object),
+                                    outlier_df[['student', 'archetype', 'step', 'output', 'v_ok']].astype(object),
                                     width='stretch')
                     else:
                         st.success("✅ No anomalies found.")
@@ -2235,7 +2236,7 @@ with tab_clusters:
             with col_h3:
                 mst_color_mode = st.selectbox(
                     "Color MST Nodes by:",
-                    ["Default (Density)", "Student Model", "Psychotype"],
+                    ["Default (Density)", "Student Model", "Archetype"],
                     key="umap_mst_color_mode_old"
                 )
 
@@ -2288,15 +2289,15 @@ with tab_clusters:
                         color_col = "Cluster Name"
                         if mst_color_mode == "Student Model":
                             color_col = "student"
-                        elif mst_color_mode == "Psychotype":
-                            color_col = "psychotype"
+                        elif mst_color_mode == "Archetype":
+                            color_col = "archetype"
 
                         fig_hdb = px.scatter(
                             df_hdb, x='x_umap', y='y_umap',
                             color=color_col,
                             symbol='student' if 'student' in df_hdb.columns else None,
                             title="UMAP + HDBSCAN: Latent Space Distribution",
-                            hover_data=['psychotype', 'bias', 'val'] if 'psychotype' in df_hdb.columns else None,
+                            hover_data=['archetype', 'bias', 'val'] if 'archetype' in df_hdb.columns else None,
                             template="plotly_dark",
                             color_discrete_sequence=px.colors.qualitative.Vivid
                         )
@@ -2319,7 +2320,7 @@ with tab_clusters:
                             st.warning("Dataset too small for MST projection (need >32 samples).")
                         # Overlaying colored nodes
                         if mst_color_mode != "Default (Density)":
-                            target_col = "student" if mst_color_mode == "Student Model" else "psychotype"
+                            target_col = "student" if mst_color_mode == "Student Model" else "archetype"
                             if target_col in df_hdb.columns:
                                 unique_vals = df_hdb[target_col].unique()
                                 for val in unique_vals:
@@ -2359,15 +2360,15 @@ with tab_clusters:
                                 "Select Outlier ID to contrast:",
                                 outlier_df.index,
                                 format_func=lambda
-                                    x: f"ID: {x} | {outlier_df.loc[x, 'student']} | {outlier_df.loc[x, 'psychotype']}"
+                                    x: f"ID: {x} | {outlier_df.loc[x, 'student']} | {outlier_df.loc[x, 'archetype']}"
                             )
 
-                            # Compare anomaly against psychotype median
+                            # Compare anomaly against archetype median
                             target_row = outlier_df.loc[selected_id]
-                            target_psych = target_row['psychotype']
+                            target_psych = target_row['archetype']
 
                             metrics_to_compare = [c for c in clean_numeric.columns if c not in ['x', 'y', 'cluster_id']]
-                            benchmarks = df_hdb[df_hdb['psychotype'] == target_psych][metrics_to_compare].median()
+                            benchmarks = df_hdb[df_hdb['archetype'] == target_psych][metrics_to_compare].median()
 
                             diff_data = []
                             for m in metrics_to_compare:
@@ -2384,7 +2385,7 @@ with tab_clusters:
 
                         # Full datafeed for inspection
                         st.write("**Full Outlier Datafeed:**")
-                        display_cols = ['student', 'psychotype', 'bias', 'val', 'v_ok', 'output']
+                        display_cols = ['student', 'archetype', 'bias', 'val', 'v_ok', 'output']
                         st.dataframe(
                             outlier_df[display_cols].style.background_gradient(subset=['v_ok'], cmap='RdYlGn'),
                             width='stretch',
@@ -2421,7 +2422,7 @@ with tab_model_evo:
             - hallucination
             - truthful output
             - anomaly
-            - psychotype
+            - archetype
             """
         )
 
@@ -2443,7 +2444,7 @@ with tab_model_evo:
                 "- label\n"
                 "- hallucination\n"
                 "- is_valid\n"
-                "- psychotype"
+                "- archetype"
             )
 
         else:
@@ -2469,7 +2470,7 @@ with tab_model_evo:
 
                 try:
 
-                    from core.model_evaluation import ModelEvaluation
+
 
                     evaluator = ModelEvaluation(
                         target_column=target_column

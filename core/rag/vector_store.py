@@ -40,7 +40,7 @@ class FAISSVectorStore:
 
         # Convert chunks to embedding input
         texts = [
-            f"{c.psychotype} | {c.domain} | {c.content}"
+            f"{c.archetype} | {c.domain} | {c.content}"
             for c in chunks
         ]
 
@@ -76,7 +76,7 @@ class FAISSVectorStore:
             chunk = self.chunks[idx]
 
             results.append({
-                "psychotype": chunk.psychotype,
+                "archetype": chunk.archetype,
                 "domain": chunk.domain,
                 "content": chunk.content
             })

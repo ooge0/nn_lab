@@ -31,11 +31,11 @@ class RAGEngine:
             raise ValueError(f"No .txt files found in {folder_path}. Please add knowledge files.")
 
         for file_name in files:
-            psychotype = file_name.replace(".txt", "")
+            archetype = file_name.replace(".txt", "")
             file_path = os.path.join(folder_path, file_name)
 
             try:
-                chunks = parse_txt_file(file_path, psychotype)
+                chunks = parse_txt_file(file_path, archetype)
                 if chunks:
                     all_chunks.extend(chunks)
             except Exception as e:
@@ -53,28 +53,28 @@ class RAGEngine:
             # This catches the "tuple index out of range" if the vector store still fails
             raise RuntimeError(f"Vector Store build failed: {e}")
 
-    def retrieve_old(self, text: str, top_k: int = 5, psychotype: str = None, **kwargs):
+    def retrieve_old(self, text: str, top_k: int = 5, archetype: str = None, **kwargs):
         raw_results = self.query(text, k=top_k * 5)
 
-        if psychotype:
-            # Match psychotype exactly
-            filtered = [r for r in raw_results if r["psychotype"].lower() == psychotype.lower()]
+        if archetype:
+            # Match archetype exactly
+            filtered = [r for r in raw_results if r["archetype"].lower() == archetype.lower()]
             return filtered[:top_k]
 
         return raw_results[:top_k]
 
-    def retrieve(self, text: str, top_k: int = 5, psychotype: str = None, **kwargs):
+    def retrieve(self, text: str, top_k: int = 5, archetype: str = None, **kwargs):
         raw_results = self.query(text, k=top_k * 5)
 
-        if psychotype:
-            raw_results = [r for r in raw_results if r["psychotype"].lower() == psychotype.lower()]
+        if archetype:
+            raw_results = [r for r in raw_results if r["archetype"].lower() == archetype.lower()]
 
         final_results = []
         for r in raw_results[:top_k]:
             # We map 'domain' to 'category' AND 'content' to 'text'
             # This makes the chunk compatible with all parts of your app
             final_results.append({
-                "psychotype": r.get("psychotype"),
+                "archetype": r.get("archetype"),
                 "category": r.get("domain"),  # Map 'domain' to 'category'
                 "content": r.get("content"),
                 "text": r.get("content")
