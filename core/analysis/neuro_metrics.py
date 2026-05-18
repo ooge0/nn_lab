@@ -1,5 +1,6 @@
-import numpy as np
 from collections import Counter
+
+import numpy as np
 from nltk.tokenize import word_tokenize, sent_tokenize
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -122,6 +123,7 @@ class NeuroMetrics:
             "modality_ext": round(self.modality(words), 3),
             "cognitive_load": round(self.cognitive_load(words, sentences, text), 3),
             "coherence": round(self.coherence(sentences), 3),
+
         }
 
     def _empty(self):
@@ -132,5 +134,5 @@ class NeuroMetrics:
             "abstract_ratio_ext": 0,
             "modality_ext": 0,
             "cognitive_load": 0,
-            "coherence": 0,
+            "coherence": 0
         }

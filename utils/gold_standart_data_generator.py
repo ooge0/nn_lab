@@ -1,8 +1,11 @@
+import os
 import json
-from types import SimpleNamespace
 import random
+from collections import Counter
 from datetime import datetime
+from types import SimpleNamespace
 
+import numpy as np
 from faker import Faker
 
 fake = Faker()
@@ -10,7 +13,8 @@ fake = Faker()
 # Psychotype definitions
 PSYCHOTYPES = ["Baseline", "Epileptoid", "Hysteroid", "Schizoid", "Paranoid"]
 BIASES = ["positive", "negative", "neutral", "toxic"]
-MODELS = ["llama3:latest", "qwen:latest", "tinyllama:latest", "phi3:latest"]
+MODELS = ["llama3:latest", "qwen:latest", "tinyllama:latest", "phi3:latest", "all-minilm:latest", "mistral:7b-instruct-q4_K_M"]
+
 
 # Step and reference counts
 step_number = len(PSYCHOTYPES) * len(BIASES) * len(MODELS) * len(MODELS)
@@ -25,7 +29,9 @@ MODEL_PERF = {
     "llama3:latest": 7,
     "qwen:latest": 6,
     "tinyllama:latest": 5,
-    "phi3:latest": 3
+    "phi3:latest": 3,
+    "all-minilm:latest": 4,
+    "mistral:7b-instruct-q4_K_M": 9
 }
 
 # Base profiles for psychotypes (POS only ADJ, NOUN, VERB)
@@ -82,9 +88,28 @@ split_bias_mode = SimpleNamespace(random=is_split)
 setattr(split_bias_mode, "True", True)
 setattr(split_bias_mode, "False", False)
 
+
 def jitter(value, sigma=0.05):
     """Gaussian jitter for tighter clusters"""
     return round(random.gauss(value, sigma), 3)
+
+
+def compute_zipf_deviation(text, top_n=50):
+    tokens = text.lower().split()  # simple tokenizer for synthetic data
+    freq = Counter(tokens)
+    if not freq:
+        return 0.0
+
+    sorted_freq = sorted(freq.values(), reverse=True)
+    ranks = np.arange(1, len(sorted_freq) + 1)
+
+    C = sorted_freq[0]
+    expected = np.array([C / r for r in ranks[:top_n]])
+    observed = np.array(sorted_freq[:top_n])
+
+    rmse = np.sqrt(np.mean((observed - expected) ** 2))
+    norm_score = rmse / max(observed) if max(observed) > 0 else 0.0
+    return round(norm_score, 4)
 
 
 def generate_record(step: int, psychotype, bias, student, teacher):
@@ -114,6 +139,7 @@ def generate_record(step: int, psychotype, bias, student, teacher):
     # Generate missing metadata matching working structure
     strategy_str = STRATEGIES[psychotype]
     sys_prompt = f"Act as psychologist. Rewrite to the {psychotype} psychotype. Return JSON with 'text' key."
+    output_text = fake.sentence(nb_words=15)
 
     record = {
         "batch": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -168,12 +194,14 @@ def generate_record(step: int, psychotype, bias, student, teacher):
         "punc_density": round(random.uniform(0.01, 0.1), 3),
         "unique_ratio": round(random.uniform(0.5, 1.0), 3)
     }
+    record["zipf_deviation"] = compute_zipf_deviation(output_text)
     return record
 
 
 if __name__ == "__main__":
+    single_teacher = True
     output_file = "../results/dummy_gold.jsonl"
-    import os
+
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
@@ -182,7 +210,10 @@ if __name__ == "__main__":
             psychotype = random.choice(PSYCHOTYPES)
             bias = random.choice(BIASES)
             student = random.choice(MODELS)
-            teacher = random.choice(MODELS)
+            if 'single_teacher':
+                    teacher = MODELS[0]
+            else:
+                teacher = random.choice(MODELS)
             rec = generate_record(step, psychotype, bias, student, teacher)
             f.write(json.dumps(rec) + "\n")
     print(f"✅ Generated {NUM_RECORDS} records into {output_file}")

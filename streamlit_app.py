@@ -23,9 +23,9 @@ if current_dir not in sys.path:
     sys.path.append(current_dir)
 from core.analysis.calculate_advanced_linguistic_metrics import calculate_advanced_linguistic_metrics
 from core.analysis.nlp_science import PsychScientist
-from core.neuro_metrics import NeuroMetrics
-from core.data_contract import LabDataBridge
-from core.cluster_discovery import ClusterDiscovery
+from core.analysis.neuro_metrics import NeuroMetrics
+from core.analysis.data_contract import LabDataBridge
+from core.analysis.cluster_discovery import ClusterDiscovery
 import hdbscan
 import numpy as np
 from sklearn.preprocessing import StandardScaler
@@ -207,7 +207,6 @@ if st.sidebar.button("Toggle 'Debug' + 'Lab'"):
 st.sidebar.title("🧪 Debug preset")
 
 with st.sidebar.expander("📊 Modes and statuses", expanded=st.session_state["open_debug"]):
-    # with st.sidebar.expander("📊 Modes and statuses", expanded=True):
     # --- Row 1: Infrastructure Status ---
     status_col1, status_col2 = st.columns(2)
 
@@ -259,19 +258,21 @@ with st.sidebar.expander("📊 Modes and statuses", expanded=st.session_state["o
 # ============================================================
 #
 # ============================================================
-st.sidebar.title("🧪 Lab Controls")
-with st.sidebar.expander("📊 Baseline Parameters", expanded=st.session_state["open_debug"]):
+st.sidebar.title("🧪 Lab controls")
+with st.sidebar.expander("📊 Baseline parameters", expanded=st.session_state["open_debug"]):
     base_temp = st.slider("Temperature", 0.0, 2.0, 0.3, 0.1)
     base_top_p = st.slider("Top P", 0.0, 1.0, 0.9, 0.05)
-    base_freq = st.slider("Freq Penalty", -2.0, 2.0, 1.1, 0.1)
-    base_pres = st.slider("Presence Penalty", -2.0, 2.0, 0.2, 0.1)
-    base_max_tokens = st.number_input("Max Tokens", 10, 4096, 800)
-    seed = st.number_input("Random Seed", value=42)
+    base_freq = st.slider("Frequency penalty", -2.0, 2.0, 1.1, 0.1)
+    base_pres = st.slider("Presence penalty", -2.0, 2.0, 0.2, 0.1)
+    base_max_tokens = st.number_input("Max tokens", 10, 4096, 800)
+    seed = st.number_input("Random seed", value=42)
 
-    col_save, col_clear = st.columns(2)
 
-with col_save:
-    if st.button("💾 Save JSONL", width='stretch'):
+# --- Two buttons side by side, outside the expander ---
+col1, col2 = st.sidebar.columns(2)
+
+with col1:
+    if st.button("💾 Save JSONL", use_container_width=True):
         if st.session_state.history:
             fname = f"{RESULTS_DIR}/lab_export_{time.strftime('%Y%m%d_%H%M%S')}.jsonl"
             with open(fname, 'w', encoding='utf-8') as f:
@@ -281,28 +282,23 @@ with col_save:
         else:
             st.sidebar.warning("No data")
 
-with col_clear:
-    if st.button("🗑️ Clear History"):
-        # 1. Reset your data
+with col2:
+    if st.button("🗑️ Clear history", use_container_width=True):
         st.session_state.history = []
         st.session_state.log_entries = []
         st.session_state.last_run_summary = ""
-
-        # 2. THE FIX: Explicitly reset the running state
         st.session_state.is_running = False
         st.session_state.stop_requested = False
-
         if "model_select" in st.session_state:
-            st.session_state.model_select = []  # Force the widget to empty correctly
-
-        # 3. Force the UI to refresh and see that 'is_running' is now False
+            st.session_state.model_select = []
         st.rerun()
 
-st.sidebar.title("📂 Experiment Recovery")
-with st.sidebar.expander(" 📂 Data", expanded=False):
-    uploaded_file = st.file_uploader("Load JSONL for Analysis", type=["jsonl"])
+
+st.sidebar.title("📂 Experiment recovery")
+with st.sidebar.expander(" 📂 Upload data", expanded=False):
+    uploaded_file = st.file_uploader("Load JSONL for analysis", type=["jsonl"])
     if uploaded_file is not None:
-        if st.button("🔄 Inject Data"):
+        if st.button("🔄 Inject data"):
             try:
                 st.session_state.history = [json.loads(line) for line in uploaded_file if line.strip()]
                 st.rerun()
@@ -317,7 +313,7 @@ with st.sidebar.expander(" 📂 Data", expanded=False):
 # 3- 📈 Analytics
 # 4- 🧪 NLP Science
 # 5- 🧩 Clustering
-# 6- 🧬 Model Evaluation
+# 6- 🧬 Model evaluation
 # 7- 📑 Benchmark
 # 8- 🖥️ Monitor
 # 9- 🛠️ Debug << depends on the SHOW_DEBUG_TAB flag
@@ -331,7 +327,7 @@ tab_labels = [
     "📈 Analytics",
     "🧪 NLP Science",
     "🧩 Clustering",
-    "🧬 Model Evaluation",
+    "🧬 Model evaluation",
     "📑 Benchmark",
     "🖥️ Monitor",
 ]
@@ -506,23 +502,23 @@ with tab_gen:
     # ========================================================
     # AUTOMATION SUITE
     # ========================================================
-    with st.expander("Automation Suite", expanded=st.session_state.auto_expanded):
+    with st.expander("Automation suite", expanded=st.session_state.auto_expanded):
         c1, c2, c3 = st.columns(3)
 
-        # 1. Self Critic (Synced to st.session_state["self_critic"])
-        self_critic = c1.checkbox(
-            "Self-Critic Mode",
-            key="self_critic"  # CRITICAL: Must match sidebar key
-        )
+        # 1. Use st.markdown inside c1 with a header style instead of st.subheader
+        c1.markdown("### Model orchestration")
 
-        # 2. Strategy (Synced to st.session_state["prompt_strategy"])
+        # 2. Render the fields across the parallel columns
+        self_critic = c1.checkbox("Self-Critic mode", key="self_critic")
+
+        # 3. Render the remaining radio options in column 1
         prompt_strategy = c1.radio(
-            "Prompt Strategy",
-            ["Expert Psychologist (Tuned)", "Blind Mode (Hide Label)", "Raw / No System Prompt"],
+            "Prompt strategy",
+            ["Expert Psychologist (Tuned)", "Blind mode (Hide label)", "Raw / No system prompt"],
             key="prompt_strategy"
         )
 
-        # 3. Teacher (Synced to st.session_state["teacher_model_key"])
+        # 5. Teacher (Synced to st.session_state["teacher_model_key"])
         teacher_model = c2.selectbox(
             "Teacher (Judge)",
             ["Select Teacher..."] + m_names,
@@ -530,7 +526,7 @@ with tab_gen:
             key="teacher_model_key"
         )
 
-        # 4. Students (Synced to st.session_state["model_select"])
+        # 6. Students (Synced to st.session_state["model_select"])
         student_models = c3.multiselect(
             "Students (Generators)",
             m_names,
@@ -599,7 +595,8 @@ with tab_gen:
         # ====================================================
         st.subheader("Active sweep parameters")
         current_sweep = st.radio("Sweep Parameter",
-                                 ["None", "Temperature", "Top P", "Freq Penalty", "Presence Penalty"], horizontal=True,
+                                 ["None", "Temperature", "Top P", "Frequency penalty", "Presence penalty"],
+                                 horizontal=True,
                                  key="current_sweep", label_visibility="collapsed")
 
         # Create weighted columns with a small gap
@@ -613,8 +610,8 @@ with tab_gen:
         center = {
             "Temperature": base_temp,
             "Top P": base_top_p,
-            "Freq Penalty": base_freq,
-            "Presence Penalty": base_pres
+            "Frequency penalty": base_freq,
+            "Presence penalty": base_pres
         }.get(current_sweep, 0.5)
 
         # 2. Define v_min and v_max based on mode
@@ -689,7 +686,7 @@ with tab_gen:
     # EXPERIMENT DATA
     # ========================================================
 
-    with st.expander("Experiment Data", expanded=st.session_state.exp_expanded):
+    with st.expander("Experiment data", expanded=st.session_state.exp_expanded):
         c_in, c_out = st.columns(2)
         with c_in:
             # 5. Psychotypes (Synced to st.session_state["selected_psychotypes"])
@@ -700,13 +697,13 @@ with tab_gen:
             )
 
             target_biases_raw = st.text_input(
-                "Target Biases",
+                "Target biases",
                 value="personalization, formal, toxic"
             )
 
-            # 6. Split Biases (Synced to st.session_state["split_biases"])
+            # 6. Split biases (Synced to st.session_state["split_biases"])
             split_biases = st.checkbox(
-                "Split Biases",
+                "Split biases",
                 key="split_biases"
             )
 
@@ -716,10 +713,10 @@ with tab_gen:
 
             mask_disabled = (
                     prompt_strategy ==
-                    "Blind Mode (Hide Label)"
+                    "Blind mode (Hide label)"
                     or
                     prompt_strategy ==
-                    "Raw / No System Prompt"
+                    "Raw / No system prompt"
             )
 
             exclude_from_prompt = st.checkbox(
@@ -748,7 +745,7 @@ with tab_gen:
                         f"Return JSON with 'text' key."
                     )
 
-                elif prompt_strategy == "Blind Mode (Hide Label)":
+                elif prompt_strategy == "Blind mode (Hide label)":
 
                     default_prompt = (
                         "Act as psychologist. "
@@ -763,7 +760,7 @@ with tab_gen:
                 default_prompt = ""
 
             sys_prompt = st.text_area(
-                "System Prompt",
+                "System prompt",
                 value=default_prompt,
                 height=100
             )
@@ -917,13 +914,13 @@ with tab_gen:
                 # SYSTEM PROMPT
                 # --------------------------------------------
 
-                if prompt_strategy == "Raw / No System Prompt":
+                if prompt_strategy == "Raw / No system prompt":
 
                     iter_sys_prompt = (
                         PSYCHOTYPES[current_type]
                     )
 
-                elif prompt_strategy == "Blind Mode (Hide Label)":
+                elif prompt_strategy == "Blind mode (Hide label)":
 
                     iter_sys_prompt = (
                         "Act as psychologist. "
@@ -1014,9 +1011,9 @@ with tab_gen:
                                 else base_temp,
                                 "top_p": v_val if current_sweep == "Top P"
                                 else base_top_p,
-                                "frequency_penalty": v_val if current_sweep == "Freq Penalty"
+                                "frequency_penalty": v_val if current_sweep == "Frequency penalty"
                                 else base_freq,
-                                "presence_penalty": v_val if current_sweep == "Presence Penalty"
+                                "presence_penalty": v_val if current_sweep == "Presence penalty"
                                 else base_pres,
                                 "max_tokens": base_max_tokens,
                                 "seed": seed
@@ -1345,16 +1342,20 @@ with tab_perf:
         total_records = len(df)
         steps_count = df['step'].iloc[-1] if 'step' in df.columns else "N/A"
 
-        # 2. Strategy & Logic
+        # 2. Models
+        teachers = df['teacher'].unique().tolist()
+        students = df['student'].unique().tolist()
+
+        # 3. Strategy & Logic
         prompt_strategy = df['strategy'].unique().tolist()
         psychotypes_list = df['psychotype'].unique().tolist()
         bias_mode = df['bias'].unique().tolist()
 
-        # 3. RAG Status
+        # 4. RAG Status
         rag_active = df['rag_enabled'].any()
         rag_modes = df['rag_mode'].unique().tolist() if rag_active else ["Disabled"]
 
-        # 4. Final summary_data Dictionary
+        # 5. Final summary_data Dictionary
         summary_data = {
             "Metric": [
                 "Total Records",
@@ -1364,7 +1365,9 @@ with tab_perf:
                 "Estimated Processing Time",
                 "Avg. MS per Word",
                 "Avg. Validation Time",
-                "Prompt Strategy",
+                "teacher",
+                "student(s)",
+                "Prompt strategy",
                 "Psychotypes",
                 "Biases",
                 "Split bias mode",
@@ -1379,6 +1382,8 @@ with tab_perf:
                 duration_str,
                 f"{df['ms_per_word'].mean():.2f} ms",
                 f"{df['validation_duration_ms'].mean() / 1000:.2f} sec",
+                ", ".join(teachers),
+                ", ".join(students),
                 ", ".join(map(str, prompt_strategy)),
                 ", ".join(map(str, psychotypes_list)),
                 ", ".join(map(str, bias_mode)),
@@ -1397,7 +1402,7 @@ with tab_perf:
             # Display in Streamlit
             st.table(summary_df)
 
-        # --- 3. Full Data View ---
+        # --- 6. Full Data View ---
         with st.expander("Raw experiment logs", expanded=False):
             st.dataframe(df, width='stretch')
 
@@ -1406,34 +1411,56 @@ with tab_perf:
 # ============================================================
 with tab_analytics:
     st.subheader("📈 Analytics")
+
     if st.session_state.history:
         # Load data from session history
         df = pd.json_normalize(st.session_state.history)
 
         # Define subtabs
-        sub_tab_heatmap, sub_tab_high_dim = st.tabs(["🔥 Adherence & Metrics", "🌐 High-Dim Analytics"])
+        sub_tab_heatmap, sub_tab_high_dim, sub_tab_zipf = st.tabs([
+            "🔥 Adherence & Metrics",
+            "🌐 High-Dim Analytics",
+            "📊 Zipf Deviation"
+        ])
 
+        # -------------------------------
+        # Subtab 1: Adherence & Metrics
+        # -------------------------------
         with sub_tab_heatmap:
             st.subheader("🔥 Adherence Heatmap (By Parameter)")
-            # Calculate pass rate per model per 'val' (temperature/top_p)
             if 'val' in df.columns and 'v_ok_numeric' in df.columns:
-                pivot = df.pivot_table(index='student', columns='val', values='v_ok_numeric', aggfunc='mean',
-                                       fill_value=0)
-                st.dataframe(pivot.style.background_gradient(cmap='RdYlGn', axis=None).format("{:.0%}"),
-                             width='stretch')
+                pivot = df.pivot_table(
+                    index='student',
+                    columns='val',
+                    values='v_ok_numeric',
+                    aggfunc='mean',
+                    fill_value=0
+                )
+                st.dataframe(
+                    pivot.style.background_gradient(cmap='RdYlGn', axis=None).format("{:.0%}"),
+                    width='stretch'
+                )
 
-            st.plotly_chart(px.pie(df, names='student', title="Workload Distribution", template="plotly_dark"),
-                            width='stretch')
+            st.plotly_chart(
+                px.pie(df, names='student', title="Workload Distribution", template="plotly_dark"),
+                width='stretch'
+            )
 
             st.divider()
             st.subheader("⚡ Performance & Velocity")
             col_p1, col_p2 = st.columns(2)
             with col_p1:
-                st.plotly_chart(px.box(df, x="student", y="duration_ms", color="student", title="Latency (ms)",
-                                       template="plotly_dark"), width='stretch')
+                st.plotly_chart(
+                    px.box(df, x="student", y="duration_ms", color="student", title="Latency (ms)",
+                           template="plotly_dark"),
+                    width='stretch'
+                )
             with col_p2:
-                st.plotly_chart(px.line(df, y="ms_per_word", color="student", title="Generation Velocity (ms/word)",
-                                        template="plotly_dark"), width='stretch')
+                st.plotly_chart(
+                    px.line(df, y="ms_per_word", color="student", title="Generation Velocity (ms/word)",
+                            template="plotly_dark"),
+                    width='stretch'
+                )
 
             st.divider()
             st.subheader("📝 Volume & Diversity")
@@ -1441,32 +1468,45 @@ with tab_analytics:
             with col_v1:
                 st.plotly_chart(
                     px.line(df, y="word_count", color="student", markers=True, title="Word Count Consistency",
-                            template="plotly_dark"), width='stretch')
+                            template="plotly_dark"),
+                    width='stretch'
+                )
             with col_v2:
                 st.plotly_chart(
                     px.bar(df, x="student", y="unique_ratio", color="student", title="Vocabulary Diversity Ratio",
-                           template="plotly_dark"), width='stretch')
+                           template="plotly_dark"),
+                    width='stretch'
+                )
 
             st.divider()
             st.subheader("⚖️ Linguistic Distance")
             col_l1, col_l2 = st.columns(2)
             with col_l1:
-                st.plotly_chart(px.bar(df, x="student", y="levenshtein_dist", color="val", barmode="group",
-                                       title="Levenshtein Distance to Teacher", template="plotly_dark"),
-                                width='stretch')
+                st.plotly_chart(
+                    px.bar(df, x="student", y="levenshtein_dist", color="val", barmode="group",
+                           title="Levenshtein Distance to Teacher", template="plotly_dark"),
+                    width='stretch'
+                )
             with col_l2:
-                st.plotly_chart(px.line(df, y="semantic_overlap", color="student", title="Semantic Alignment Overlap",
-                                        template="plotly_dark"), width='stretch')
+                st.plotly_chart(
+                    px.line(df, y="semantic_overlap", color="student", title="Semantic Alignment Overlap",
+                            template="plotly_dark"),
+                    width='stretch'
+                )
 
             st.divider()
             st.subheader("🎭 Psycholinguistic Signature")
-            st.plotly_chart(px.scatter(df, x="punc_density", y="expansion_ratio", color="psychotype", symbol="student",
-                                       size="word_count", title="Style Distribution (Raw Space)",
-                                       template="plotly_dark"), width='stretch')
+            st.plotly_chart(
+                px.scatter(df, x="punc_density", y="expansion_ratio", color="psychotype", symbol="student",
+                           size="word_count", title="Style Distribution (Raw Space)", template="plotly_dark"),
+                width='stretch'
+            )
 
+        # -------------------------------
+        # Subtab 2: High-Dim Analytics
+        # -------------------------------
         with sub_tab_high_dim:
             st.subheader("🌐 Multi-Model Dependency Analytics")
-
             required_cols = ['lexical_density', 'ms_per_word', 'cognitive_load']
             if all(col in df.columns for col in required_cols):
                 with st.spinner("Calculating Pipeline..."):
@@ -1484,8 +1524,38 @@ with tab_analytics:
                 st.plotly_chart(figs[4], width='stretch', key="plot_matrix_cross")
             else:
                 st.warning(f"Missing columns: {[c for c in required_cols if c not in df.columns]}")
+
+        # -------------------------------
+        # Subtab 3: Zipf Deviation
+        # -------------------------------
+        with sub_tab_zipf:
+            st.subheader("📊 Zipf Deviation Benchmarking")
+
+            if "zipf_deviation" in df.columns:
+                # Distribution per model
+                st.plotly_chart(
+                    px.box(df, x="student", y="zipf_deviation", color="student",
+                           title="Zipf Deviation Distribution (Normalized)",
+                           template="plotly_dark"),
+                    width='stretch'
+                )
+
+                # By psychotype
+                if "psychotype" in df.columns:
+                    st.plotly_chart(
+                        px.bar(df, x="psychotype", y="zipf_deviation", color="student",
+                               barmode="group", title="Zipf Deviation by Psychotype",
+                               template="plotly_dark"),
+                        width='stretch'
+                    )
+            else:
+                st.warning("No Zipf deviation scores found in history. Run generation with metrics enabled.")
+
+
+
     else:
         st.info("No experiment data found. Run a generation first or upload data set.")
+
 
 # ============================================================
 #  NLP Science
@@ -1630,7 +1700,8 @@ with tab_nlp:
                     color="psychotype",
                     points="all",
                     notched=True,
-                    title="Linguistic Rigidity: Impact of Bias"
+                    title="Linguistic Rigidity: Impact of Bias",
+                    hover_data = "student",
                 ), width='stretch')
 
             with col_f_f:
@@ -1642,6 +1713,7 @@ with tab_nlp:
                     color="psychotype",
                     size="word_count",
                     title="Abstract Thinking vs Processing Load",
+                    hover_data="student",
                 ), width='stretch')
 
             # --- Row 6: Coherence & Emotional Dynamics ---
@@ -1657,7 +1729,8 @@ with tab_nlp:
                     y="neuro_coherence",
                     color="psychotype",
                     points="all",
-                    title="Logical Continuity per Psychotype"
+                    title="Logical Continuity per Psychotype",
+                    hover_data="student",
                 ), width='stretch')
 
             with col_h:
@@ -1669,7 +1742,8 @@ with tab_nlp:
                     y="sentiment_variance",
                     color="psychotype",
                     points="all",
-                    title="Emotional Stability per Psychotype"
+                    title="Emotional Stability per Psychotype",
+                    hover_data="student",
                 ), width='stretch')
     else:
         st.info("No experiment data found. Run a generation first or upload data set.")
@@ -1840,7 +1914,7 @@ with tab_clusters:
                     fig_mst, ax_mst = plt.subplots(figsize=(12, 8))
                     fig_mst.patch.set_facecolor('#0e1117')
                     ax_mst.set_facecolor('#0e1117')
-#
+
                     # Base MST Plot
                     if len(df) > 32:
                         clusterer.minimum_spanning_tree_.plot(
@@ -1879,8 +1953,6 @@ with tab_clusters:
                         ax_mst.scatter(df_hdb['x'], df_hdb['y'], c='cyan', s=10, alpha=0.3)
 
                     ax_mst.axis('off')
-
-
 
                     st.pyplot(fig_mst)
 
@@ -2332,7 +2404,7 @@ with tab_clusters:
 # ============================================================
 
 with tab_model_evo:
-    st.subheader("🧬 Model Evaluation")
+    st.subheader("🧬 Model evaluation")
 
     if df is None or df.empty:
         st.info(
@@ -2592,7 +2664,7 @@ with tab_benchmark:
             st.plotly_chart(fig_quality, width='stretch')
 
         # --- 6. PSYCHOLINGUISTIC SIGNATURE ---
-        st.subheader("🧠 Psycholinguistic Signature")
+        st.subheader("🧠 Psycholinguistic signature")
         psycho_cols = [
             "self_focus", "modality", "cognitive_density",
             "abstract_ratio", "repetition_score"
@@ -2671,7 +2743,7 @@ with tab_monitor:
     # Pull Model
     # ============================================================
     st.markdown("##### Pull Model")
-    with st.expander("📦 Recommended Models for ~4GB VRAM", expanded=False):
+    with st.expander("📦 Model list", expanded=False):
 
         model_df = pd.DataFrame([
             {"Model": "gemma2:2b", "Size (GB)": 1.6},
@@ -2679,6 +2751,7 @@ with tab_monitor:
             {"Model": "llama3.2:3b", "Size (GB)": 2.0},
             {"Model": "qwen2.5:3b", "Size (GB)": 2.1},
             {"Model": "tinyllama:latest", "Size (GB)": 0.7},
+            {"Model": "all-MiniLM", "Size (GB)": 0.05},
             {"Model": "stablelm2:1.6b", "Size (GB)": 1.0},
             {"Model": "deepseek-r1:1.5b", "Size (GB)": 1.1},
             {"Model": "mistral:7b-instruct-q4_K_M", "Size (GB)": 4.1},

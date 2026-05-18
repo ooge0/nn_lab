@@ -213,8 +213,25 @@ Total generation and response validation time.
 ### 🧩 Clustering
 
 - **Advanced Density Clustering (UMAP + HDBSCAN)** Used for latent space analysis and identifying structures in data.  
-  - **UMAP** — dimensionality reduction preserving local and global structure.  
+  - **UMAP** — Uniform Manifold Approximation and Projection. Dimensionality reduction preserving local and global structure.  
   - **HDBSCAN** — density-based clustering with automatic noise determination.
+    References:
+    - HDBSCAN: 
+      - [How HDBSCAN Works](https://hdbscan.readthedocs.io/en/latest/how_hdbscan_works.html)
+      - UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction (2018) 
+        - PDF: https://arxiv.org/pdf/1802.03426
+      - Shapley-based explainable AI for clustering applications in fault diagnosis and prognosis
+        - DOI:10.1007/s10845-024-02468-2
+      - Unsupervised Learning: Comparative Analysis of Clustering Techniques on High-Dimensional Data
+        - PDF: https://arxiv.org/html/2503.23215v1
+      - The Information Geometry of UMAP
+        - PDF: https://hal.science/hal-04819511v1/file/umap_information_geometry.pdf
+      - Dim Reduction & Vis. Advanced Data Visualization. CS 6965. Fall 2019. Prof. Bei Wang Phillips University of Utah
+        - https://www.sci.utah.edu/~beiwang/teaching/cs6965-fall-2019/Lecture02-DR.pdf
+      - Clustering, Regression and Vis. Advanced Data Visualization. CS 6965. Fall 2019. Prof. Bei Wang Phillips University of Utah
+        - https://www.sci.utah.edu/~beiwang/teaching/cs6965-fall-2019/Lecture06-Clustering.pdf
+
+
 
 - **Parameters:** - *Min Cluster Size* — minimum number of points in a cluster.  
   - *Min Samples* — minimum number of neighbors to determine density.  
