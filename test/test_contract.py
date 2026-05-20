@@ -1,6 +1,6 @@
 import pytest
 
-from core.data_contract import LabDataBridge, LabSchema
+from core.analysis.data_contract import LabDataBridge, LabSchema
 
 
 # --- FIXTURES & HELPERS ---

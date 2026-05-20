@@ -15,9 +15,10 @@ import streamlit as st
 from loguru import logger
 from openai import OpenAI
 
-from core.rag.ingestion import RAGEngine
 from core.analysis.model_evaluation import ModelEvaluation
+from core.rag.ingestion import RAGEngine
 from tmp.simple_plotty_staff import get_high_dim_dashboard
+from utils.app_utils import AppUtils
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
@@ -80,6 +81,10 @@ LOG_FILE = os.path.join(LOGS_DIR, "lab_debug.log")
 logger.remove()
 logger.add(LOG_FILE, rotation="10 MB", retention="10 days", level="INFO",
            format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")
+
+# Resources
+knowledge_path = "./knowledge/rag"
+sys_prompts_defined_file_path = "./knowledge/sys_prompts_defined.json"
 
 # ============================================================
 #  PAGE CONFIG
@@ -145,51 +150,67 @@ if "pull_logs" not in st.session_state:
 if "pull_running" not in st.session_state:
     st.session_state.pull_running = False
 
-ARCHETYPES = {
-    "Neutral": "Balanced, polite, task-oriented, and objective communication without emotional or structural extremes.",
-    "Expressive": "Theatrical, egocentric, focus on external effect.",
-    "Defensive": "Suspicious, focus on hidden threats and logic.",
-    "Detached": "Emotional coldness, focus on abstract concepts.",
-    "Structured": "Focus on order, rules, meticulously aggressive."
-}
-
 
 # ============================================================
-# UTILS
+# HELPER FUNCTIONS
 # ============================================================
+
 def trigger_stop():
-    st.session_state.is_running = False
-    st.session_state.stop_requested = False
+    """
+    Stop current generation loop safely.
+    """
+    st.session_state.stop_requested = True
 
 
-def extract_best_text(raw_json_str):
+def extract_best_text(raw_response):
+    """
+    Extract clean text from model response.
+
+    Handles:
+    - JSON responses
+    - plain text
+    """
+
     try:
-        parsed = json.loads(raw_json_str)
-        return str(parsed.get("text", next(iter(parsed.values())) if parsed else "EMPTY"))
-    except:
-        return raw_json_str
+        import json
+
+        parsed = json.loads(raw_response)
+
+        if isinstance(parsed, dict):
+            return parsed.get("text", raw_response)
+
+        return raw_response
+
+    except Exception:
+        return raw_response
 
 
 def render_console():
-    return f'<div class="terminal-container">{"".join([f"<div class=\"terminal-line\">{e}</div>" for e in reversed(st.session_state.log_entries)])}</div>'
-
-
-def stream_pull_output(process):
     """
-    Reads ollama pull stdout in real time.
+    Render log console as HTML.
     """
-    while True:
-        line = process.stdout.readline()
 
-        if not line:
-            break
+    logs = st.session_state.log_entries[-20:]
 
-        clean = line.strip()
+    html = """
+    <div style="
+        background:#111;
+        padding:10px;
+        border-radius:8px;
+        height:300px;
+        overflow-y:auto;
+        font-family:monospace;
+        font-size:12px;
+        color:#ddd;
+    ">
+    """
 
-        if clean:
-            st.session_state.pull_logs.append(clean)
+    for line in logs:
+        html += f"<div>{line}</div>"
 
-    process.stdout.close()
+    html += "</div>"
+
+    return html
 
 
 # ============================================================
@@ -260,14 +281,13 @@ with st.sidebar.expander("📊 Modes and statuses", expanded=st.session_state["o
 #
 # ============================================================
 st.sidebar.title("🧪 Lab controls")
-with st.sidebar.expander("📊 Neutral parameters", expanded=st.session_state["open_debug"]):
+with st.sidebar.expander("📊 Baseline parameters", expanded=st.session_state["open_debug"]):
     base_temp = st.slider("Temperature", 0.0, 2.0, 0.3, 0.1)
     base_top_p = st.slider("Top P", 0.0, 1.0, 0.9, 0.05)
     base_freq = st.slider("Frequency penalty", -2.0, 2.0, 1.1, 0.1)
     base_pres = st.slider("Presence penalty", -2.0, 2.0, 0.2, 0.1)
     base_max_tokens = st.number_input("Max tokens", 10, 4096, 800)
     seed = st.number_input("Random seed", value=42)
-
 
 # --- Two buttons side by side, outside the expander ---
 col1, col2 = st.sidebar.columns(2)
@@ -293,7 +313,6 @@ with col2:
         if "model_select" in st.session_state:
             st.session_state.model_select = []
         st.rerun()
-
 
 st.sidebar.title("📂 Experiment recovery")
 with st.sidebar.expander(" 📂 Upload data", expanded=False):
@@ -358,11 +377,6 @@ else:
     tab_faq = tabs[8]
 
 df = None
-
-# if "history" in st.session_state and st.session_state.history:
-#     df = pd.json_normalize(st.session_state.history)
-# else:
-#     st.info("Run automation to populate the metric analytics.")
 df = pd.json_normalize(st.session_state.history) if st.session_state.history else pd.DataFrame()
 
 # ============================================================
@@ -387,91 +401,6 @@ for k, v in DEFAULT_SESSION_VALUES.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-
-# ============================================================
-# HELPER FUNCTIONS
-# ============================================================
-
-def trigger_stop():
-    """
-    Stop current generation loop safely.
-    """
-    st.session_state.stop_requested = True
-
-
-def extract_best_text(raw_response):
-    """
-    Extract clean text from model response.
-
-    Handles:
-    - JSON responses
-    - plain text
-    """
-
-    try:
-        import json
-
-        parsed = json.loads(raw_response)
-
-        if isinstance(parsed, dict):
-            return parsed.get("text", raw_response)
-
-        return raw_response
-
-    except Exception:
-        return raw_response
-
-
-def render_console():
-    """
-    Render log console as HTML.
-    """
-
-    logs = st.session_state.log_entries[-20:]
-
-    html = """
-    <div style="
-        background:#111;
-        padding:10px;
-        border-radius:8px;
-        height:300px;
-        overflow-y:auto;
-        font-family:monospace;
-        font-size:12px;
-        color:#ddd;
-    ">
-    """
-
-    for line in logs:
-        html += f"<div>{line}</div>"
-
-    html += "</div>"
-
-    return html
-
-
-# ============================================================
-# ARCHETYPES
-# ============================================================
-
-ARCHETYPES = {
-
-    "Expressive":
-        "Theatrical, egocentric, emotional amplification, dramatic expression.",
-
-    "Defensive":
-        "Suspicious, threat-focused, defensive logic, distrustful reasoning.",
-
-    "Detached":
-        "Emotionally detached, abstract, low social engagement, conceptual focus.",
-
-    "Structured":
-        "Order-focused, rigid, structured, control-oriented communication.",
-
-    "Neutral":
-        "Balanced, objective, emotionally neutral, polite and task-oriented."
-}
-
 # ============================================================
 # BASE GENERATION PARAMS
 # ============================================================
@@ -480,7 +409,6 @@ base_temp = 0.7
 base_top_p = 0.9
 base_max_tokens = 300
 seed = 42
-
 # ============================================================
 #        -=-=-=-=-=-=-=-= UI -=-=-=-=-=-=-=-=
 # ============================================================
@@ -563,13 +491,6 @@ with tab_gen:
             disabled=not rag_enabled
         )
 
-        # knowledge_path = r4.text_input(
-        #     "Knowledge Path",
-        #     value="./knowledge",
-        # #     disabled=not rag_enabled
-        # )
-
-        knowledge_path = "./knowledge"
         # ====================================================
         # LOAD RAG ENGINE
         # ====================================================
@@ -686,14 +607,18 @@ with tab_gen:
     # ========================================================
     # EXPERIMENT DATA
     # ========================================================
+    # Load archetypes
+    app_utils = AppUtils()
+    ARCHETYPES = app_utils.load_archetypes(sys_prompts_defined_file_path)
 
     with st.expander("Experiment data", expanded=st.session_state.exp_expanded):
         c_in, c_out = st.columns(2)
         with c_in:
             # 5. Archetypes (Synced to st.session_state["selected_archetypes"])
+            # Build UI list from archetype names
             selected_archetypes = st.multiselect(
                 "Archetypes",
-                list(ARCHETYPES.keys()),
+                [k for k in ARCHETYPES.keys() if k != "common"],  # exclude global phrases
                 key="selected_archetypes"
             )
 
@@ -730,40 +655,37 @@ with tab_gen:
             # SYSTEM PROMPT PREVIEW
             # ------------------------------------------------
 
+            default_prompt = ""
+
             if selected_archetypes:
+                for archetype in selected_archetypes:
+                    arche_def = ARCHETYPES.get(archetype, {})
+                    sys_text = arche_def.get("sys_prompt", "")
+                    about_text = arche_def.get("about", "")
 
-                display_names = (
-                    "[HIDDEN]"
-                    if exclude_from_prompt
-                    else ", ".join(selected_archetypes)
-                )
+                    display_name = "[HIDDEN]" if exclude_from_prompt else archetype
 
-                if prompt_strategy == "Behavioral conditioning (Tuned)":
-
-                    default_prompt = (
-                        f"Act as Behavioral conditioning. "
-                        f"Rewrite to the {display_names} archetype(s). "
-                        f"Return JSON with 'text' key."
-                    )
-
-                elif prompt_strategy == "Blind mode (Hide label)":
-
-                    default_prompt = (
-                        "Act as Behavioral conditioning. "
-                        "Rewrite using personality traits. "
-                        "Return JSON with 'text' key."
-                    )
-
-                else:
-                    default_prompt = ""
-
-            else:
-                default_prompt = ""
+                    if prompt_strategy == "Behavioral conditioning (Tuned)":
+                        default_prompt += (
+                            f"{ARCHETYPES['common']['intro']} "
+                            f"{ARCHETYPES['common']['pre_phrase']}"
+                            f"{selected_archetypes} archetype(s) "
+                            f"(bias: {target_biases_raw}). "
+                            f"{ARCHETYPES['common']['post_phrase_main']}.\n "
+                            f"{ARCHETYPES['common']['post_phrase_rules']}."
+                        )
+                    elif prompt_strategy == "Blind mode (Hide label)":
+                        default_prompt += (
+                            f"{ARCHETYPES['common']['intro']}\n"
+                            "Rewrite using personality traits.\n"
+                            f"{ARCHETYPES['common']['post_phrase_main']} "
+                            f"{ARCHETYPES['common']['post_phrase_rules']}\n\n"
+                        )
 
             sys_prompt = st.text_area(
                 "System prompt",
-                value=default_prompt,
-                height=100
+                value=default_prompt.strip(),
+                height=150
             )
 
             # ------------------------------------------------
@@ -907,54 +829,6 @@ with tab_gen:
             # =================================================
 
             for current_type in selected_archetypes:
-
-                if st.session_state.stop_requested:
-                    break
-
-                # --------------------------------------------
-                # SYSTEM PROMPT
-                # --------------------------------------------
-
-                if prompt_strategy == "Raw / No system prompt":
-
-                    iter_sys_prompt = (
-                        ARCHETYPES[current_type]
-                    )
-                
-                elif prompt_strategy == "Blind mode (Hide label)":
-
-                    iter_sys_prompt = (
-                        "Act as psychologist. "
-                        f"Rewrite using traits: "
-                        f"{ARCHETYPES[current_type]}. "
-                        "Return JSON with 'text' key."
-                    )
-
-                else:
-
-                    if exclude_from_prompt:
-
-                        iter_sys_prompt = (
-                            "Act as psychologist. "
-                            f"Rewrite using traits: "
-                            f"{ARCHETYPES[current_type]}. "
-                            "Return JSON with 'text' key."
-                        )
-
-                    else:
-
-                        iter_sys_prompt = (
-                            "Act as psychologist. "
-                            f"Rewrite to the "
-                            f"{current_type} archetype: "
-                            f"{ARCHETYPES[current_type]}. "
-                            "Return JSON with 'text' key."
-                        )
-
-                # =============================================
-                # STUDENT LOOP
-                # =============================================
-
                 for student in student_models:
 
                     if st.session_state.stop_requested:
@@ -973,261 +847,179 @@ with tab_gen:
                             # --------------------------------
                             # PROGRESS
                             # --------------------------------
-
                             st.session_state.current_progress += 1
-
                             elapsed = time.strftime(
                                 "%H:%M:%S",
-                                time.gmtime(
-                                    time.time()
-                                    -
-                                    start_batch_time
-                                )
+                                time.gmtime(time.time() - start_batch_time)
                             )
 
                             current_summary = (
-                                f"Progress: "
-                                f"{st.session_state.current_progress}/"
+                                f"Progress: {st.session_state.current_progress}/"
                                 f"{st.session_state.total_tasks} "
                                 f"| TYPE: {current_type} "
+                                f"| BIAS: {b_item} "
                                 f"| TIME: {elapsed}"
                             )
 
                             prog_placeholder.progress(
-                                st.session_state.current_progress
-                                /
-                                st.session_state.total_tasks
+                                st.session_state.current_progress / st.session_state.total_tasks
                             )
-
-                            stats_placeholder.info(
-                                current_summary
-                            )
+                            stats_placeholder.info(current_summary)
 
                             # --------------------------------
                             # PARAMS
                             # --------------------------------
-
                             params = {
-                                "temperature": v_val if current_sweep == "Temperature"
-                                else base_temp,
-                                "top_p": v_val if current_sweep == "Top P"
-                                else base_top_p,
-                                "frequency_penalty": v_val if current_sweep == "Frequency penalty"
-                                else base_freq,
-                                "presence_penalty": v_val if current_sweep == "Presence penalty"
-                                else base_pres,
+                                "temperature": v_val if current_sweep == "Temperature" else base_temp,
+                                "top_p": v_val if current_sweep == "Top P" else base_top_p,
+                                "frequency_penalty": v_val if current_sweep == "Frequency penalty" else base_freq,
+                                "presence_penalty": v_val if current_sweep == "Presence penalty" else base_pres,
                                 "max_tokens": base_max_tokens,
                                 "seed": seed
                             }
 
                             try:
-
                                 # =================================
                                 # RAG RETRIEVAL
                                 # =================================
-
                                 rag_context = ""
                                 rag_chunks = []
                                 rag_query = ""
 
-                                if (
-                                        rag_enabled
-                                        and
-                                        st.session_state.rag_engine
-                                ):
-
+                                if rag_enabled and st.session_state.rag_engine:
                                     if rag_mode == "Archetype Only":
-
                                         rag_query = current_type
-
                                     elif rag_mode == "Archetype + Bias":
-
-                                        rag_query = (
-                                            f"{current_type} "
-                                            f"{b_item}"
-                                        )
-
+                                        rag_query = f"{current_type} {b_item}"
                                     else:
-
                                         rag_query = b_item
 
-                                    rag_chunks = (
-                                        st.session_state
-                                        .rag_engine
-                                        .retrieve(
-                                            rag_query,
-                                            top_k=rag_top_k
-                                        )
+                                    rag_chunks = st.session_state.rag_engine.retrieve(
+                                        rag_query, top_k=rag_top_k
                                     )
 
                                     rag_context = "\n\n".join([
-                                        (
-                                            f"[{x['archetype']} | "
-                                            f"{x['category']}]\n"
-                                            f"{x['text']}"
-                                        )
+                                        f"[{x['archetype']} | {x['category']}]\n{x['text']}"
                                         for x in rag_chunks
                                     ])
 
                                 # =================================
-                                # FINAL USER PROMPT
+                                # SYSTEM PROMPT (bias injected)
                                 # =================================
-
-                                if rag_context:
-
-                                    final_user_prompt = f"""
-TASK:
-{b_item}
-
-REFERENCE KNOWLEDGE:
-{rag_context}
-
-INSTRUCTION:
-Generate response using retrieved archetype information.
-"""
-
+                                if prompt_strategy == "Behavioral conditioning (Tuned)":
+                                    # f"{ARCHETYPES[current_type]['sys_prompt_main']} archetype "
+                                    iter_sys_prompt = (
+                                        f"{ARCHETYPES['common']['intro']} "
+                                        f"{ARCHETYPES['common']['pre_phrase']}"
+                                        f"{current_type} archetype "
+                                        f"(bias: {b_item}). "
+                                        f"{ARCHETYPES['common']['post_phrase_main']} "
+                                        f"{ARCHETYPES['common']['post_phrase_rules']}"
+                                    )
+                                elif prompt_strategy == "Blind mode (Hide label)":
+                                    iter_sys_prompt = (
+                                        f"{ARCHETYPES['common']['intro']} "
+                                        f"Rewrite using traits: "
+                                        f"{ARCHETYPES[current_type]['sys_prompt_main']} "
+                                        f"(bias: {b_item}). ",
+                                        f"{ARCHETYPES['common']['post_phrase_main']} "
+                                    )
+                                elif prompt_strategy == "Raw / No system prompt":
+                                    iter_sys_prompt = (
+                                        f"{ARCHETYPES[current_type]['sys_prompt_main']} "
+                                        f"(bias: {b_item})"
+                                    )
                                 else:
+                                    iter_sys_prompt = (
+                                        f"{ARCHETYPES['common']['intro']} "
+                                        f"Rewrite to the {current_type} archetype "
+                                        f"(bias: {b_item}): "
+                                        f"{ARCHETYPES[current_type]['sys_prompt_main']}. "
+                                        "Return JSON with 'text' key."
+                                    )
 
-                                    final_user_prompt = b_item
+                                # =================================
+                                # FINAL USER PROMPT (bias injected)
+                                # =================================
+                                if rag_context:
+                                    final_user_prompt = f"""
+                                   TASK:
+                                   {b_item}
+            
+                                   REFERENCE KNOWLEDGE:
+                                   {rag_context}
+            
+                                   INSTRUCTION:
+                                   Generate response using retrieved archetype information with bias: {b_item}.
+                                   """
+                                else:
+                                    final_user_prompt = f"{b_item}"
 
                                 # =================================
                                 # GENERATION
                                 # =================================
-
                                 start_t = time.time()
-
                                 res = client.chat.completions.create(
                                     model=student,
                                     messages=[
-                                        {
-                                            "role": "system",
-                                            "content": iter_sys_prompt
-                                        },
-                                        {
-                                            "role": "user",
-                                            "content": final_user_prompt
-                                        }
+                                        {"role": "system", "content": iter_sys_prompt},
+                                        {"role": "user", "content": final_user_prompt}
                                     ],
-                                    response_format={
-                                        "type": "json_object"
-                                    }
-                                    if "JSON" in iter_sys_prompt
-                                    else None,
+                                    response_format={"type": "json_object"} if "JSON" in iter_sys_prompt else None,
                                     **params
                                 )
-
-                                gen_dur = (
-                                                  time.time()
-                                                  -
-                                                  start_t
-                                          ) * 1000
-
-                                clean_text = extract_best_text(
-                                    res.choices[0]
-                                    .message
-                                    .content
-                                )
+                                gen_dur = (time.time() - start_t) * 1000
+                                clean_text = extract_best_text(res.choices[0].message.content)
 
                                 # =================================
                                 # NLP ANALYSIS
                                 # =================================
-
                                 sci = PsychScientist()
+                                neuro = NeuroMetrics(sci.sia)
 
-                                neuro = NeuroMetrics(
-                                    sci.sia
-                                )
-
-                                nlp_stats = sci.analyze_text(
-                                    clean_text,
-                                    gen_dur
-                                )
-
-                                neuro_stats = neuro.compute(
-                                    clean_text
-                                )
-
-                                base_metrics = (
-                                    calculate_advanced_linguistic_metrics(
-                                        b_item,
-                                        clean_text,
-                                        gen_dur
-                                    )
+                                nlp_stats = sci.analyze_text(clean_text, gen_dur)
+                                neuro_stats = neuro.compute(clean_text)
+                                base_metrics = calculate_advanced_linguistic_metrics(
+                                    b_item, clean_text, gen_dur
                                 )
 
                                 # =================================
-                                # VALIDATION
+                                # VALIDATION (bias-aware)
                                 # =================================
-
-                                judge = (
-                                    student
-                                    if self_critic
-                                    else teacher_model
-                                )
-
+                                judge = student if self_critic else teacher_model
                                 v_start = time.time()
-
                                 v_res = client.chat.completions.create(
                                     model=judge,
                                     messages=[
                                         {
                                             "role": "system",
-                                            "content":
-                                                (
-                                                    "Validator. "
-                                                    "Return JSON: "
-                                                    "{\"ok\": true/false}"
-                                                )
+                                            "content": "Validator. Return JSON: {\"ok\": true/false}"
                                         },
                                         {
                                             "role": "user",
-                                            "content":
-                                                (
-                                                    f"Type: {current_type}\n"
-                                                    f"Text: {clean_text}"
-                                                )
+                                            "content": f"Type: {current_type}\nBias: {b_item}\nText: {clean_text}"
                                         }
                                     ],
-                                    response_format={
-                                        "type": "json_object"
-                                    }
+                                    response_format={"type": "json_object"}
                                 )
-
-                                v_ok = (
-                                        "true"
-                                        in
-                                        v_res.choices[0]
-                                        .message
-                                        .content
-                                        .lower()
-                                )
-
-                                v_dur = (
-                                                time.time()
-                                                -
-                                                v_start
-                                        ) * 1000
+                                v_ok = "true" in v_res.choices[0].message.content.lower()
+                                v_dur = (time.time() - v_start) * 1000
 
                                 # =================================
-                                # FINAL ENTRY
+                                # FINAL ENTRY (bias logged)
                                 # =================================
-
                                 st.session_state.steps += 1
-                                entry = {
 
+                                entry = {
                                     "batch": time.strftime("%Y-%m-%d %H:%M:%S"),
                                     "total_tasks": st.session_state.total_tasks,
                                     "steps": st.session_state.steps,
-                                    "step":
-                                        (
-                                            f"{st.session_state.current_progress}/"
-                                            f"{st.session_state.total_tasks}"
-                                        ),
+                                    "step": f"{st.session_state.current_progress}/{st.session_state.total_tasks}",
                                     "strategy": prompt_strategy,
                                     "archetype": current_type,
-                                    "split_bias_mode": bool(st.session_state.get("split_biases", False)),
                                     "bias": b_item,
                                     "system_prompt": iter_sys_prompt,
+                                    "archetype_about": ARCHETYPES[current_type]["about"],
                                     "student": student,
                                     "teacher": judge,
                                     "sweet_param": current_sweep,
@@ -1238,60 +1030,46 @@ Generate response using retrieved archetype information.
                                     "duration_ms": gen_dur,
                                     "validation_duration_ms": v_dur,
                                     "rag_enabled": rag_enabled,
-                                    "rag_mode":
-                                        rag_mode
-                                        if rag_enabled
-                                        else None,
-                                    "rag_top_k":
-                                        rag_top_k
-                                        if rag_enabled
-                                        else None,
-                                    "rag_query":
-                                        rag_query,
-                                    "rag_chunks_count":
-                                        len(rag_chunks),
-                                    "rag_context_chars":
-                                        len(rag_context),
-                                    "rag_context":
-                                        rag_context
+                                    "rag_mode": rag_mode if rag_enabled else None,
+                                    "rag_top_k": rag_top_k if rag_enabled else None,
+                                    "rag_query": rag_query,
+                                    "rag_chunks_count": len(rag_chunks),
+                                    "rag_context_chars": len(rag_context),
+                                    "rag_context": rag_context
                                 }
-                                # MERGE METRICS
-                                # =================================
+                                # sweep params validation in case when 'Active sweep parameters' mode is not 'None'
+                                if current_sweep == "None":
+                                    entry["sweet_param"] = "Baseline"
+                                    entry["val"] = base_temp  # scalar for plotting convenience
+                                    entry["val_temperature"] = base_temp
+                                    entry["val_top_p"] = base_top_p
+                                    entry["val_frequency_penalty"] = base_freq
+                                    entry["val_presence_penalty"] = base_pres
+                                else:
+                                    entry["sweet_param"] = current_sweep
+                                    entry["val"] = v_val  # also log baseline values for context
+                                    entry["val_temperature"] = base_temp
+                                    entry["val_top_p"] = base_top_p
+                                    entry["val_frequency_penalty"] = base_freq
+                                    entry["val_presence_penalty"] = base_pres
 
+                                # Merge metrics
                                 entry.update(nlp_stats)
                                 entry.update(neuro_stats)
                                 entry.update(base_metrics)
 
-                                # =================================
-                                # SAVE
-                                # =================================
-
-                                st.session_state.history.append(
-                                    entry
-                                )
-
+                                # Save
+                                st.session_state.history.append(entry)
                                 st.session_state.log_entries.append(
-                                    (
-                                        f"SUCCESS | "
-                                        f"{student} | "
-                                        f"{current_type}"
-                                    )
-                                )
+                                    f"SUCCESS | {student} | {current_type} | bias={b_item}")
 
                             except Exception as e:
-
-                                st.session_state.log_entries.append(
-                                    f"ERROR: {str(e)}"
-                                )
+                                st.session_state.log_entries.append(f"ERROR: {str(e)}")
 
                             # --------------------------------
                             # REFRESH LOG
                             # --------------------------------
-
-                            log_placeholder.markdown(
-                                render_console(),
-                                unsafe_allow_html=True
-                            )
+                            log_placeholder.markdown(render_console(), unsafe_allow_html=True)
 
             st.success("Generation complete.")
 
@@ -1416,6 +1194,7 @@ with tab_analytics:
     if st.session_state.history:
         # Load data from session history
         df = pd.json_normalize(st.session_state.history)
+        print(f"f.columns: {df.columns.tolist()}")
 
         # Define subtabs
         sub_tab_heatmap, sub_tab_high_dim, sub_tab_zipf = st.tabs([
@@ -1482,11 +1261,36 @@ with tab_analytics:
             st.divider()
             st.subheader("⚖️ Linguistic Distance")
             col_l1, col_l2 = st.columns(2)
+            # Decide which column to use for coloring
+            if "sweet_param" in df.columns:
+                active_param = df["sweet_param"].iloc[0]  # look at first row, or use a selector
+                if active_param == "Temperature":
+                    color_col = "val"
+                elif active_param == "Top P":
+                    color_col = "val"
+                elif active_param == "Frequency penalty":
+                    color_col = "val"
+                elif active_param == "Presence penalty":
+                    color_col = "val"
+                else:
+                    # Baseline run: pick a default, e.g. temperature
+                    color_col = "val_temperature"
+            else:
+                color_col = "val_temperature"
+
+            # Now plot with the chosen column
             with col_l1:
                 st.plotly_chart(
-                    px.bar(df, x="student", y="levenshtein_dist", color="val", barmode="group",
-                           title="Levenshtein Distance to Teacher", template="plotly_dark"),
-                    width='stretch'
+                    px.bar(
+                        df,
+                        x="student",
+                        y="levenshtein_dist",
+                        color=color_col,
+                        barmode="group",
+                        title="Levenshtein Distance to Teacher",
+                        template="plotly_dark"
+                    ),
+                    use_container_width=True
                 )
             with col_l2:
                 st.plotly_chart(
@@ -1556,7 +1360,6 @@ with tab_analytics:
 
     else:
         st.info("No experiment data found. Run a generation first or upload data set.")
-
 
 # ============================================================
 #  NLP Science
@@ -1702,7 +1505,7 @@ with tab_nlp:
                     points="all",
                     notched=True,
                     title="Linguistic Rigidity: Impact of Bias",
-                    hover_data = "student",
+                    hover_data="student",
                 ), width='stretch')
 
             with col_f_f:
@@ -2469,8 +2272,6 @@ with tab_model_evo:
             if st.button("🚀 Run Evaluation"):
 
                 try:
-
-
 
                     evaluator = ModelEvaluation(
                         target_column=target_column

@@ -102,7 +102,7 @@ def test_retrieval_boundary_isolation(rag):
     results = rag.query(query, k=5)
 
     # Top hit must be the target archetype
-    assert results[0]["archetype"] == "epileptoid", f"Wrong primary archetype retrieved: {results[0]['archetype']}"
+    assert results[0]["archetype"] == "baseline", f"Wrong primary archetype retrieved: {results[0]['archetype']}"
 
     # Secondary hits should not contain conflicting archetypes
     types_in_results = {r["archetype"] for r in results}

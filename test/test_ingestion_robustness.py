@@ -1,6 +1,5 @@
 import pytest
-import os
-import shutil
+
 from core.rag.ingestion import RAGEngine
 
 
