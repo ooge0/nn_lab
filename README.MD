@@ -220,4 +220,20 @@ pkill ollama
 - App works on Windows 11 and Ubuntu  
 - Fully local via Ollama  
 - Designed for model evaluation, psychotype transformation, and behavior analysis
+
+
+### UMAP , HDBSCAN
+
+```text
+High-dimensional features
+        ↓
+StandardScaler
+        ↓
+UMAP projection
+        ↓
+HDBSCAN density graph
+        ↓
+Mutual reachability graph
+        ↓
+Minimum spanning tree
 ```

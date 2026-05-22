@@ -34,7 +34,7 @@ The sidebar is the main control block for the experiment:
   - **Inject Data** — reusing data in a new run or loading previously generated data 
 ---
 
-### 🚀 Generation
+### 🚀 Syntethic data
 
 This section describes the generation and model interaction mechanisms:
 
@@ -72,7 +72,7 @@ This section describes the generation and model interaction mechanisms:
 
 ---
 
-### 📊 Performance
+### 📊 Runtime metrics
 
 This section describes model performance and latency metrics:
 
@@ -96,7 +96,7 @@ This section describes model performance and latency metrics:
 
 ---
 
-### 📈 Analytics
+### 📈 Behavioral analytics
 
 This section describes tools for analyzing the style and quality of generations:
 
@@ -126,7 +126,7 @@ This section describes tools for analyzing the style and quality of generations:
 
 ---
 
-### 🧪 NLP Science
+### 🧪 NLP features
 #### POS Morphology Profile
 Part-of-speech distribution:
   - ADJ (adjectives)
@@ -210,7 +210,7 @@ Total generation and response validation time.
 
 ---
 
-### 🧩 Clustering
+### 🧩 Embedding clusters
 
 - **Advanced Density Clustering (UMAP + HDBSCAN)** Used for latent space analysis and identifying structures in data.  
   - **UMAP** — Uniform Manifold Approximation and Projection. Dimensionality reduction preserving local and global structure.  
@@ -278,7 +278,7 @@ $$
 
 ---
 
-### 🧬 Model Evaluation
+### 🧬 LLM Evaluation
 
 This section contains information on the comprehensive evaluation of models:
 
@@ -359,7 +359,7 @@ This section contains information on the comprehensive evaluation of models:
 
 ---
 
-### 🖥️ Monitor
+### 🖥️ System monitor
 This section includes:
 - Model download interface. 
 - List of locally loaded models, their size in GB, and deletion buttons for each model. 
@@ -372,7 +372,7 @@ This section includes:
 ### ❓ FAQ
 - **Why does the Heatmap show 0%?** → Usually caused by a Temperature value that is too high or a weak Teacher model.  
 - **What is Blind Mode?** → Generation mode without explicit psychotype designation to check model generalizability.  
-- **What is the NLP Science tab for?** → For checking statistical and psycholinguistic features of generated text.  
+- **What is the NLP features tab for?** → For checking statistical and psycholinguistic features of generated text.  
 - **Can this tool be used outside of psychology?** → Yes, for analyzing style, genre, formality, and linguistic diversity.  
 - **How to interpret the Scatter Plot (Overlap vs Expansion)?** → Top left corner = creative expansion, bottom right = conservative paraphrasing, center = balanced transformation.  
 - **What does Repetition Score mean?** → High values indicate fixation or a limited vocabulary; low values — flexibility.  
@@ -384,7 +384,7 @@ This section includes:
 - **What is RAG mode needed for?** → Retrieval‑Augmented Generation allows the model to base responses on external context or psychotype data.  
 - **Why are some results marked as Noise in Clustering?** → They do not match the expected psychotype cluster and are marked as anomalies.  
 - **What does Self‑Critic mode do?** → The model itself evaluates its own output regarding psychotype constraints without a Teacher.  
-- **How to check the validity of psychotype emulation?** → In the Model Evaluation tab, select target column = psychotype; validation results will show accuracy.  
+- **How to check the validity of psychotype emulation?** → In the LLM Evaluation tab, select target column = psychotype; validation results will show accuracy.  
 - **What is the difference between Single Shot and Sweep Mode?** → Single Shot = one generation; Sweep Mode = a series of runs with parameter variations.  
 - **Can results be exported for external analysis?** → Yes, they are logged in JSONL and can be exported to CSV.  
 - **What does the Emotional Profile include?** → Subjectivity (TextBlob) and Sentiment (VADER) for measuring emotionality and tone.  

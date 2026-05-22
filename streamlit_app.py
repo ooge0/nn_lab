@@ -89,7 +89,8 @@ sys_prompts_defined_file_path = "./knowledge/sys_prompts_defined.json"
 # ============================================================
 #  PAGE CONFIG
 # ============================================================
-st.set_page_config(page_title="Psych Data Lab Pro", layout="wide", page_icon="🧠")
+st.set_page_config(page_title="LLM Data lab", layout="wide", page_icon="🧠")
+st.title("📊 LLM Data lab")
 
 st.markdown("""
     <style>
@@ -293,7 +294,7 @@ with st.sidebar.expander("📊 Baseline parameters", expanded=st.session_state["
 col1, col2 = st.sidebar.columns(2)
 
 with col1:
-    if st.button("💾 Save JSONL", use_container_width=True):
+    if st.button("💾 Save JSONL", width='stretch'):
         if st.session_state.history:
             fname = f"{RESULTS_DIR}/lab_export_{time.strftime('%Y%m%d_%H%M%S')}.jsonl"
             with open(fname, 'w', encoding='utf-8') as f:
@@ -304,7 +305,7 @@ with col1:
             st.sidebar.warning("No data")
 
 with col2:
-    if st.button("🗑️ Clear history", use_container_width=True):
+    if st.button("🗑️ Clear history", width='stretch'):
         st.session_state.history = []
         st.session_state.log_entries = []
         st.session_state.last_run_summary = ""
@@ -328,34 +329,34 @@ with st.sidebar.expander(" 📂 Upload data", expanded=False):
 # ============================================================
 #  MAIN INTERFACE
 # ============================================================
-# 1- 🚀 Generation
-# 2- 📊 Performance
-# 3- 📈 Analytics
-# 4- 🧪 NLP Science
-# 5- 🧩 Clustering
-# 6- 🧬 Model evaluation
+# 1- 🚀 Synthetic data
+# 2- 📊 Runtime metrics
+# 3- 📈 Behavioral analytics
+# 4- 🧪 NLP features
+# 5- 🧩 Embedding clusters
+# 6- 🧬 LLM Evaluation
 # 7- 📑 Benchmark
-# 8- 🖥️ Monitor
+# 8- 🖥️ System monitor
 # 9- 🛠️ Debug << depends on the SHOW_DEBUG_TAB flag
-# 10- ❓ FAQ
+# 10- ❓ Methodology
 
 SHOW_DEBUG_TAB = False
 
 tab_labels = [
-    "🚀 Generation",
-    "📊 Performance",
-    "📈 Analytics",
-    "🧪 NLP Science",
-    "🧩 Clustering",
-    "🧬 Model evaluation",
+    "🚀 Synthetic data",
+    "📊 Runtime metrics",
+    "📈 Behavioral analytics",
+    "🧪 NLP features",
+    "🧩 Embedding clusters",
+    "🧬 LLM Evaluation",
     "📑 Benchmark",
-    "🖥️ Monitor",
+    "🖥️ System monitor",
 ]
 
 if SHOW_DEBUG_TAB:
     tab_labels.append("🛠️ Debug")
 
-tab_labels.append("❓ FAQ")
+tab_labels.append("❓ Methodology")
 
 tabs = st.tabs(tab_labels)
 
@@ -414,7 +415,7 @@ seed = 42
 # ============================================================
 
 # ============================================================
-# TAB: GENERATION
+# TAB: Synthetic data
 # Full RAG-enabled Generation Pipeline
 # ============================================================
 
@@ -1088,7 +1089,7 @@ with tab_gen:
 # Performance TAB (HIDDEN)
 # ============================================================
 with tab_perf:
-    st.subheader("📊 Performance Summary")
+    st.subheader("📊 Runtime metrics summary")
     if df is None or df.empty:
         st.info("No experiment data found. Run a generation first or upload data set.")
     else:
@@ -1189,12 +1190,11 @@ with tab_perf:
 # Analytics
 # ============================================================
 with tab_analytics:
-    st.subheader("📈 Analytics")
+    st.subheader("📈 Behavioral analytics")
 
     if st.session_state.history:
         # Load data from session history
         df = pd.json_normalize(st.session_state.history)
-        print(f"f.columns: {df.columns.tolist()}")
 
         # Define subtabs
         sub_tab_heatmap, sub_tab_high_dim, sub_tab_zipf = st.tabs([
@@ -1290,7 +1290,7 @@ with tab_analytics:
                         title="Levenshtein Distance to Teacher",
                         template="plotly_dark"
                     ),
-                    use_container_width=True
+                    width='stretch'
                 )
             with col_l2:
                 st.plotly_chart(
@@ -1362,7 +1362,7 @@ with tab_analytics:
         st.info("No experiment data found. Run a generation first or upload data set.")
 
 # ============================================================
-#  NLP Science
+#  NLP features
 # ============================================================
 with tab_nlp:
     st.subheader("🧪 Deep NLP Investigation (NLTK)")
@@ -1561,8 +1561,8 @@ with tab_clusters:
         st.info("No experiment data found. Run a generation first or upload data set.")
     else:
         # Layout for algorithms
-        sub_tab_pca, sub_tab_hdbscan, sub_tab_hdbscan_UMAP, sub_tab_hdbscan_UMAP_old = st.tabs(
-            ["K-Means (PCA)", "HDBSCAN (Density)", "sub_tab_hdbscan_UMAP", "sub_tab_hdbscan_UMAP_old"])
+        sub_tab_pca, sub_tab_hdbscan, sub_tab_hdbscan_UMAP, sub_tab_hdbscan_UMAP_2, sub_tab_behavioral_topology = st.tabs(
+            ["K-Means (PCA)", "HDBSCAN (Density)", "HDBSCAN + UMAP", "HDBSCAN + UMAP v.2", "Behavioral topology"])
 
         with sub_tab_pca:
             # 1. Configuration & Data Prep
@@ -2017,7 +2017,7 @@ with tab_clusters:
             else:
                 st.warning("Insufficient data points after filtering.")
 
-        with sub_tab_hdbscan_UMAP_old:
+        with sub_tab_hdbscan_UMAP_2:
             st.write("### 🌌 Advanced Density Clustering (UMAP + HDBSCAN)")
             st.info(
                 "UMAP helps separate 'collapsed' data, highlighting the unique behavioral fingerprint of each model.")
@@ -2203,12 +2203,610 @@ with tab_clusters:
             else:
                 st.warning("Insufficient data for HDBSCAN. Please add more records.")
 
+        with sub_tab_behavioral_topology:
+            st.subheader("🧠 Behavioral Topology Lab")
+            st.caption(
+                "Academic-style latent space analysis for behavioral response clustering, topology exploration, anomaly detection, and model conditioning evaluation."
+            )
+
+            if df is None or df.empty:
+                st.info("No data loaded.")
+
+            else:
+
+                # ============================================================
+                # INTERNAL TABS
+                # ============================================================
+                (
+                    topology_tab_engine,
+                    topology_tab_projection,
+                    topology_tab_hdbscan,
+                    topology_tab_membership,
+                    topology_tab_research,
+                    topology_tab_anomaly,
+                    topology_tab_fit
+                ) = st.tabs([
+                    "⚙️ Engine Configuration",
+                    "📍 Latent Projection",
+                    "🌐 HDBSCAN Topology",
+                    "🧩 Cluster Membership",
+                    "🧪 Research Mode",
+                    "🚩 Behavioral Anomalies",
+                    "📐 Fit Indices"
+                ])
+
+                # ============================================================
+                # SESSION STATE DEFAULTS
+                # ============================================================
+                if "bt_selected_features" not in st.session_state:
+                    st.session_state.bt_selected_features = []
+
+                # ============================================================
+                # FEATURE GROUPS
+                # ============================================================
+                FEATURE_GROUPS = {
+                    "Behavioral": [
+                        "sentiment",
+                        "subjectivity",
+                        "rigidity",
+                        "modality",
+                        "cognitive_density",
+                        "cognitive_load",
+                        "coherence",
+                        "abstract_ratio",
+                        "semantic_overlap",
+                    ],
+
+                    "Linguistic": [
+                        "lexical_density",
+                        "corrected_ttr",
+                        "avg_sentence_length",
+                        "word_count",
+                        "readability_ari",
+                        "unique_ratio",
+                        "repetition_score",
+                        "punc_density",
+                        "zipf_deviation",
+                    ],
+
+                    "Runtime": [
+                        "duration_ms",
+                        "validation_duration_ms",
+                        "ms_per_word",
+                    ],
+
+                    "Validation": [
+                        "val",
+                        "v_ok_numeric",
+                        "levenshtein_dist",
+                        "expansion_ratio",
+                    ]
+                }
+
+                # ============================================================
+                # ENGINE CONFIGURATION
+                # ============================================================
+                with topology_tab_engine:
+
+                    st.write("### ⚙️ Analysis Engine Configuration")
+
+                    with st.expander("🧬 Feature Space", expanded=True):
+                        selected_groups = st.multiselect(
+                            "Feature Groups",
+                            list(FEATURE_GROUPS.keys()),
+                            default=["Behavioral", "Linguistic"]
+                        )
+
+                        selected_features = []
+                        for grp in selected_groups:
+                            selected_features.extend(FEATURE_GROUPS[grp])
+
+                        selected_features = [
+                            c for c in selected_features
+                            if c in df.columns
+                        ]
+
+                        selected_features = st.multiselect(
+                            "Selected Features",
+                            selected_features,
+                            default=selected_features
+                        )
+
+                        st.session_state.bt_selected_features = selected_features
+
+                    with st.expander("🧹 Data Filtering", expanded=False):
+                        bt_filter_vok = st.toggle(
+                            "Exclude invalid samples (v_ok == 0)",
+                            value=True,
+                            key="bt_filter_vok"
+                        )
+
+                        bt_remove_json = st.toggle(
+                            "Remove raw JSON outputs",
+                            value=True,
+                            key="bt_remove_json"
+                        )
+
+                        bt_min_words = st.slider(
+                            "Minimum word count",
+                            0,
+                            500,
+                            15,
+                            key="bt_min_words"
+                        )
+
+                        bt_min_coherence = st.slider(
+                            "Minimum coherence",
+                            -1.0,
+                            1.0,
+                            -1.0,
+                            0.01,
+                            key="bt_min_coherence"
+                        )
+
+                        bt_remove_duplicates = st.toggle(
+                            "Remove duplicated outputs",
+                            value=False,
+                            key="bt_remove_duplicates"
+                        )
+
+                    with st.expander("📍 Projection Space (Visualization)", expanded=False):
+                        bt_vis_neighbors = st.slider(
+                            "Visualization Neighbors",
+                            2,
+                            100,
+                            15,
+                            key="bt_vis_neighbors"
+                        )
+
+                        bt_vis_min_dist = st.slider(
+                            "Visualization Min Distance",
+                            0.0,
+                            1.0,
+                            0.1,
+                            0.01,
+                            key="bt_vis_min_dist"
+                        )
+
+                    with st.expander("🌐 Density Space (Clustering)", expanded=False):
+                        bt_cluster_neighbors = st.slider(
+                            "Clustering Neighbors",
+                            2,
+                            100,
+                            20,
+                            key="bt_cluster_neighbors"
+                        )
+
+                        bt_cluster_components = st.slider(
+                            "Clustering Embedding Dimensions",
+                            2,
+                            50,
+                            15,
+                            key="bt_cluster_components"
+                        )
+
+                        bt_min_cluster_size = st.slider(
+                            "Min Cluster Size",
+                            2,
+                            100,
+                            10,
+                            key="bt_min_cluster_size"
+                        )
+
+                        bt_min_samples = st.slider(
+                            "Min Samples",
+                            1,
+                            50,
+                            3,
+                            key="bt_min_samples"
+                        )
+
+                # ============================================================
+                # DATA PREPARATION
+                # ============================================================
+                from sklearn.preprocessing import StandardScaler
+                from sklearn.metrics import silhouette_score
+                from sklearn.metrics import davies_bouldin_score
+                from sklearn.metrics import adjusted_rand_score
+
+                from umap import UMAP
+
+                bt_df = df.copy()
+
+                # -----------------------------
+                # Filtering
+                # -----------------------------
+                if st.session_state.get("bt_filter_vok", True):
+                    if "v_ok_numeric" in bt_df.columns:
+                        bt_df = bt_df[bt_df["v_ok_numeric"] != 0]
+
+                if "output" in bt_df.columns:
+
+                    bt_df = bt_df[
+                        bt_df["output"].astype(str).str.split().str.len() >= st.session_state.get("bt_min_words", 15)
+                        ]
+
+                    if st.session_state.get("bt_remove_json", True):
+                        bt_df = bt_df[
+                            ~bt_df["output"].astype(str).str.contains(r'^\\{"text":', regex=True, na=False)
+                        ]
+
+                if "coherence" in bt_df.columns:
+                    bt_df = bt_df[
+                        bt_df["coherence"] >= st.session_state.get("bt_min_coherence", -1.0)
+                        ]
+
+                if st.session_state.get("bt_remove_duplicates", False):
+                    bt_df = bt_df.drop_duplicates(subset=["output"])
+
+                # -----------------------------
+                # Features
+                # -----------------------------
+                feature_cols = [
+                    c for c in st.session_state.bt_selected_features
+                    if c in bt_df.columns
+                ]
+
+                numeric_df = bt_df[feature_cols].copy()
+                numeric_df = numeric_df.replace([np.inf, -np.inf], np.nan).fillna(0)
+
+                scaler = StandardScaler()
+                scaled_data = scaler.fit_transform(numeric_df)
+
+                # ============================================================
+                # PROJECTION SPACE (2D)
+                # ============================================================
+                reducer_vis = UMAP(
+                    n_neighbors=st.session_state.get("bt_vis_neighbors", 15),
+                    min_dist=st.session_state.get("bt_vis_min_dist", 0.1),
+                    n_components=2,
+                    random_state=42
+                )
+
+                vis_embedding = reducer_vis.fit_transform(scaled_data)
+
+                bt_df["x_vis"] = vis_embedding[:, 0]
+                bt_df["y_vis"] = vis_embedding[:, 1]
+
+                # ============================================================
+                # DENSITY SPACE (15D)
+                # ============================================================
+                reducer_cluster = UMAP(
+                    n_neighbors=st.session_state.get("bt_cluster_neighbors", 20),
+                    min_dist=0.0,
+                    n_components=st.session_state.get("bt_cluster_components", 15),
+                    random_state=42
+                )
+
+                cluster_embedding = reducer_cluster.fit_transform(scaled_data)
+
+                clusterer = hdbscan.HDBSCAN(
+                    min_cluster_size=st.session_state.get("bt_min_cluster_size", 10),
+                    min_samples=st.session_state.get("bt_min_samples", 3),
+                    prediction_data=True,
+                    gen_min_span_tree=True
+                )
+
+                cluster_labels = clusterer.fit_predict(cluster_embedding)
+
+                bt_df["cluster_id"] = cluster_labels
+                bt_df["cluster_name"] = bt_df["cluster_id"].apply(
+                    lambda x: "Noise" if x == -1 else f"Cluster {x}"
+                )
+
+                # ============================================================
+                # OUTLIERS
+                # ============================================================
+                outlier_df = bt_df[bt_df["cluster_id"] == -1].copy()
+
+                # ============================================================
+                # TAB 1 — LATENT PROJECTION
+                # ============================================================
+                with topology_tab_projection:
+
+                    st.write("### 📍 Latent Projection Space")
+
+                    with st.expander("📊 Projection Controls", expanded=False):
+                        projection_color = st.selectbox(
+                            "Color By",
+                            [
+                                "cluster_name",
+                                "archetype",
+                                "student",
+                                "strategy",
+                                "bias"
+                            ],
+                            key="bt_projection_color"
+                        )
+
+                        show_noise = st.toggle(
+                            "Show Noise",
+                            value=True,
+                            key="bt_show_noise"
+                        )
+
+                    vis_df = bt_df.copy()
+
+                    if not show_noise:
+                        vis_df = vis_df[vis_df["cluster_id"] != -1]
+
+                    fig_projection = px.scatter(
+                        vis_df,
+                        x="x_vis",
+                        y="y_vis",
+                        color=projection_color,
+                        symbol="student",
+                        hover_data=[
+                            "archetype",
+                            "bias",
+                            "val",
+                            "v_ok_numeric",
+                            "word_count",
+                            "coherence"
+                        ],
+                        template="plotly_dark",
+                        title="UMAP Projection Space"
+                    )
+
+                    fig_projection.update_traces(
+                        marker=dict(size=8, opacity=0.75)
+                    )
+
+                    st.plotly_chart(fig_projection, width="stretch")
+
+                    c1, c2, c3, c4 = st.columns(4)
+
+                    c1.metric("Samples", len(bt_df))
+                    c2.metric("Clusters", len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0))
+                    c3.metric("Outlier Rate", f"{(len(outlier_df) / len(bt_df) * 100):.1f}%")
+                    c4.metric("Features", len(feature_cols))
+
+                # ============================================================
+                # TAB 2 — HDBSCAN TOPOLOGY
+                # ============================================================
+                with topology_tab_hdbscan:
+
+                    st.write("### 🌐 HDBSCAN Topology Space")
+                    st.caption(
+                        "Topology visualization is displayed separately from UMAP projection to preserve academic correctness.")
+
+                    topology_subtab_mst, topology_subtab_condensed = st.tabs([
+                        "Minimum Spanning Tree",
+                        "Condensed Tree"
+                    ])
+
+                    with topology_subtab_mst:
+                        fig_mst, ax_mst = plt.subplots(figsize=(12, 8))
+                        fig_mst.patch.set_facecolor('#0e1117')
+                        ax_mst.set_facecolor('#0e1117')
+
+                        clusterer.minimum_spanning_tree_.plot(
+                            axis=ax_mst,
+                            node_size=0,
+                            edge_alpha=0.5,
+                            edge_cmap='viridis',
+                            edge_linewidth=1.5,
+                            vary_line_width=True
+                        )
+
+                        ax_mst.axis('off')
+                        st.pyplot(fig_mst)
+
+                    with topology_subtab_condensed:
+                        fig_condensed, ax_condensed = plt.subplots(figsize=(12, 8))
+                        fig_condensed.patch.set_facecolor('#0e1117')
+                        ax_condensed.set_facecolor('#0e1117')
+
+                        clusterer.condensed_tree_.plot(
+                            select_clusters=True,
+                            axis=ax_condensed
+                        )
+
+                        st.pyplot(fig_condensed)
+
+                # ============================================================
+                # TAB 3 — CLUSTER MEMBERSHIP
+                # ============================================================
+                with topology_tab_membership:
+
+                    st.write("### 🧩 Cluster Membership Analysis")
+
+                    membership_tab_1, membership_tab_2, membership_tab_3 = st.tabs([
+                        "Archetype Distribution",
+                        "Model Distribution",
+                        "Feature Centroids"
+                    ])
+
+                    with membership_tab_1:
+                        if "archetype" in bt_df.columns:
+                            archetype_table = pd.crosstab(
+                                bt_df["cluster_name"],
+                                bt_df["archetype"],
+                                normalize='index'
+                            ) * 100
+
+                            st.dataframe(
+                                archetype_table.style
+                                .background_gradient(axis=1, cmap='YlGnBu')
+                                .format("{:.1f}%"),
+                                width="stretch"
+                            )
+
+                    with membership_tab_2:
+                        model_table = pd.crosstab(
+                            bt_df["cluster_name"],
+                            bt_df["student"],
+                            normalize='index'
+                        ) * 100
+
+                        st.dataframe(
+                            model_table.style
+                            .background_gradient(axis=1, cmap='Blues')
+                            .format("{:.1f}%"),
+                            width="stretch"
+                        )
+
+                    with membership_tab_3:
+                        centroid_df = bt_df.groupby("cluster_name")[feature_cols].mean()
+
+                        st.dataframe(
+                            centroid_df.style.background_gradient(cmap='RdBu_r'),
+                            width="stretch"
+                        )
+
+                # ============================================================
+                # TAB 4 — RESEARCH MODE
+                # ============================================================
+                with topology_tab_research:
+
+                    st.write("### 🧪 Research Sandbox")
+
+                    with st.expander("📊 Raw Feature Correlations", expanded=False):
+                        corr_df = bt_df[feature_cols].corr(numeric_only=True)
+
+                        fig_corr = px.imshow(
+                            corr_df,
+                            template="plotly_dark",
+                            color_continuous_scale="RdBu_r",
+                            title="Feature Correlation Matrix"
+                        )
+
+                        st.plotly_chart(fig_corr, width="stretch")
+
+                    with st.expander("📍 Cluster Scatter by Feature", expanded=False):
+                        x_feature = st.selectbox(
+                            "X Feature",
+                            feature_cols,
+                            key="bt_research_x"
+                        )
+
+                        y_feature = st.selectbox(
+                            "Y Feature",
+                            feature_cols,
+                            key="bt_research_y"
+                        )
+
+                        fig_feature = px.scatter(
+                            bt_df,
+                            x=x_feature,
+                            y=y_feature,
+                            color="cluster_name",
+                            symbol="student",
+                            template="plotly_dark"
+                        )
+
+                        st.plotly_chart(fig_feature, width="stretch")
+
+                # ============================================================
+                # TAB 5 — ANOMALIES
+                # ============================================================
+                with topology_tab_anomaly:
+
+                    st.write("### 🚩 Behavioral Anomaly Analysis")
+
+                    outlier_rate = (len(outlier_df) / len(bt_df) * 100)
+
+                    c1, c2 = st.columns([1, 2])
+
+                    with c1:
+                        st.metric("Outlier Rate", f"{outlier_rate:.1f}%")
+                        st.bar_chart(outlier_df["student"].value_counts())
+
+                    with c2:
+                        if not outlier_df.empty:
+                            selected_outlier = st.selectbox(
+                                "Select Outlier",
+                                outlier_df.index,
+                                key="bt_selected_outlier"
+                            )
+
+                            target_row = outlier_df.loc[selected_outlier]
+
+                            st.write(
+                                f"**Archetype:** {target_row['archetype']} | "
+                                f"**Model:** {target_row['student']}"
+                            )
+
+                            st.info(target_row["output"])
+
+                    with st.expander("📋 Full Outlier Feed", expanded=False):
+                        st.dataframe(
+                            outlier_df[
+                                [
+                                    "student",
+                                    "archetype",
+                                    "bias",
+                                    "output",
+                                    "cluster_name",
+                                    "coherence",
+                                    "rigidity",
+                                    "sentiment"
+                                ]
+                            ].astype(object),
+                            width="stretch",
+                            height=400
+                        )
+
+                # ============================================================
+                # TAB 6 — FIT INDICES
+                # ============================================================
+                with topology_tab_fit:
+
+                    st.write("### 📐 Clustering Fit Indices")
+
+                    fit_c1, fit_c2, fit_c3, fit_c4 = st.columns(4)
+
+                    try:
+
+                        if len(set(cluster_labels)) > 1:
+
+                            sil_score = silhouette_score(cluster_embedding, cluster_labels)
+                            db_score = davies_bouldin_score(cluster_embedding, cluster_labels)
+
+                        else:
+                            sil_score = 0
+                            db_score = 99
+
+                        if "archetype" in bt_df.columns:
+                            ari_score = adjusted_rand_score(
+                                bt_df["archetype"],
+                                cluster_labels
+                            )
+                        else:
+                            ari_score = 0
+
+                        noise_ratio = (len(outlier_df) / len(bt_df)) * 100
+
+                        fit_c1.metric(
+                            "Silhouette",
+                            f"{sil_score:.3f}"
+                        )
+
+                        fit_c2.metric(
+                            "Davies-Bouldin",
+                            f"{db_score:.3f}"
+                        )
+
+                        fit_c3.metric(
+                            "ARI",
+                            f"{ari_score:.3f}"
+                        )
+
+                        fit_c4.metric(
+                            "Noise Ratio",
+                            f"{noise_ratio:.1f}%"
+                        )
+
+                    except Exception as e:
+                        st.error(e)
+
+
 # ============================================================
 # 🧬 MODEL EVALUATION
 # ============================================================
 
 with tab_model_evo:
-    st.subheader("🧬 Model evaluation")
+    st.subheader("🧬 LLM Evaluation")
 
     if df is None or df.empty:
         st.info(

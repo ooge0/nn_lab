@@ -1761,7 +1761,7 @@ with tab_clusters:
     else:
         # Layout for algorithms
         sub_tab_pca, sub_tab_hdbscan, sub_tab_hdbscan_UMAP, sub_tab_hdbscan_UMAP_old = st.tabs(
-            ["K-Means (PCA)", "HDBSCAN (Density)", "sub_tab_hdbscan_UMAP", "sub_tab_hdbscan_UMAP_old"])
+            ["K-Means (PCA)", "HDBSCAN (Density)", "sub_tab_hdbscan_UMAP", "sub_tab_hdbscan_UMAP_2"])
 
         with sub_tab_pca:
             # 1. Configuration & Data Prep
