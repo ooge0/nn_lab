@@ -1,5 +1,4 @@
-```markdown
-# Psycho-Data-Augmentor
+# LLM data lab / Psycho-Data-Augmentor
 
 **Quick Summary – Psych Data Lab**
 - App purpose: run AI/NLP models in different modes (Teacher–Student, Self‑Critic, Blind Mode) and collect structured results.
