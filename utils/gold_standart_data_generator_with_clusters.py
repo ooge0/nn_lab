@@ -7,23 +7,17 @@ from types import SimpleNamespace
 
 import numpy as np
 from faker import Faker
+from sklearn.preprocessing import StandardScaler
 
 fake = Faker()
 
-# Archetype definitions
+# --- Archetype definitions ---
 ARCHETYPES = ["Neutral", "Structured", "Expressive", "Detached", "Defensive"]
 BIASES = ["positive", "negative", "neutral", "toxic"]
 MODELS = ["llama3:latest", "qwen:latest", "tinyllama:latest", "phi3:latest", "mistral:7b-instruct-q4_K_M"]
 
-# Step and reference counts
-step_number = len(ARCHETYPES) * len(BIASES) * len(MODELS) * len(MODELS)
-ETALON = len(MODELS) * len(MODELS)
-max_total_tasks = 1200
-
-# Constant: number of records to generate
 NUM_RECORDS = 2000
 
-# Model performance ranking (higher = faster)
 MODEL_PERF = {
     "llama3:latest": 7,
     "qwen:latest": 6,
@@ -32,7 +26,6 @@ MODEL_PERF = {
     "mistral:7b-instruct-q4_K_M": 9
 }
 
-# Base profiles for archetypes (POS only ADJ, NOUN, VERB)
 POS_PROFILES = {
     "Neutral": {"ADJ": 0.30, "NOUN": 0.30, "VERB": 0.40},
     "Structured": {"ADJ": 0.15, "NOUN": 0.35, "VERB": 0.50},
@@ -42,14 +35,7 @@ POS_PROFILES = {
 }
 
 AVG_SENTENCE = {"Neutral": 11, "Structured": 17, "Expressive": 9, "Detached": 21, "Defensive": 14}
-RIGIDITY = {
-    "Neutral": 0.2,
-    "Structured": 0.8,
-    "Expressive": 0.35,
-    "Detached": 0.65,
-    "Defensive": 0.9,
-}
-# Added missing mapping dictionary to prevent crashes or missing assets
+RIGIDITY = {"Neutral": 0.2, "Structured": 0.8, "Expressive": 0.35, "Detached": 0.65, "Defensive": 0.9}
 STRATEGIES = {
     "Neutral": "Direct Adaptation",
     "Structured": "Structural Analyst",
@@ -57,75 +43,35 @@ STRATEGIES = {
     "Detached": "Abstract Conceptualizer",
     "Defensive": "Systemic Evaluator"
 }
-
-SELF_FOCUS = {
-    "Neutral": 0.15,
-    "Structured": 0.45,
-    "Expressive": 0.85,
-    "Detached": 0.55,
-    "Defensive": 0.75,
-}
-COGNITIVE_LOAD = {
-    "Neutral": 2.0,
-    "Structured": 3.5,
-    "Expressive": 4.0,
-    "Detached": 1.5,
-    "Defensive": 3.0
-}
-
-# Bias adjustments for rigidity
+SELF_FOCUS = {"Neutral": 0.15, "Structured": 0.45, "Expressive": 0.85, "Detached": 0.55, "Defensive": 0.75}
+COGNITIVE_LOAD = {"Neutral": 2.0, "Structured": 3.5, "Expressive": 4.0, "Detached": 1.5, "Defensive": 3.0}
 bias_adjust = {"positive": -0.15, "neutral": 0.0, "negative": 0.1, "toxic": 0.25}
 
-# Define the base choices
-is_split = random.choice([True, False])
-
-# Initialize with allowed variable names
-split_bias_mode = SimpleNamespace(random=is_split)
-
-# Force injection of reserved keywords as attributes
+split_bias_mode = SimpleNamespace(random=random.choice([True, False]))
 setattr(split_bias_mode, "True", True)
 setattr(split_bias_mode, "False", False)
 
-
 def jitter(value, sigma=0.05):
-    """Gaussian jitter for tighter clusters"""
     return round(random.gauss(value, sigma), 3)
 
-
 def compute_zipf_deviation(text, top_n=50):
-    tokens = text.lower().split()  # simple tokenizer for synthetic data
+    tokens = text.lower().split()
     freq = Counter(tokens)
     if not freq:
         return 0.0
-
     sorted_freq = sorted(freq.values(), reverse=True)
     ranks = np.arange(1, len(sorted_freq) + 1)
-
     C = sorted_freq[0]
     expected = np.array([C / r for r in ranks[:top_n]])
     observed = np.array(sorted_freq[:top_n])
-
     rmse = np.sqrt(np.mean((observed - expected) ** 2))
     norm_score = rmse / max(observed) if max(observed) > 0 else 0.0
     return round(norm_score, 4)
 
-def generate_record(step: int, archetype, bias, student, teacher, sweep_mode="None"):
+def generate_record(step, archetype, bias, student, teacher, sweep_mode="None"):
     v_ok = random.random() > 0.1
-
-    # Baseline values
-    base_temp = 0.7
-    base_top_p = 0.9
-    base_freq = 1.1
-    base_pres = 0.2
-
-    if sweep_mode == "None":
-        sweet_param = "Baseline"
-        val = base_temp
-    else:
-        sweet_param = sweep_mode
-        val = round(0.1 + (step / NUM_RECORDS) * (1.5 - 0.1), 3)
-
-    # Latency scaled by model performance
+    base_temp, base_top_p, base_freq, base_pres = 0.7, 0.9, 1.1, 0.2
+    val = base_temp if sweep_mode == "None" else round(0.1 + (step / NUM_RECORDS) * (1.5 - 0.1), 3)
     base = 7000 / MODEL_PERF[student]
     duration_ms = round(random.gauss(base, base * 0.1), 3)
 
@@ -141,7 +87,7 @@ def generate_record(step: int, archetype, bias, student, teacher, sweep_mode="No
     sys_prompt = f"Act as psychologist. Rewrite to the {archetype} archetype. Return JSON with 'text' key."
     output_text = fake.sentence(nb_words=15)
 
-    record = {
+    return {
         "batch": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "total_tasks": NUM_RECORDS,
         "steps": step,
@@ -154,7 +100,7 @@ def generate_record(step: int, archetype, bias, student, teacher, sweep_mode="No
         "system_prompt": sys_prompt,
         "student": student,
         "teacher": teacher,
-        "sweet_param": sweet_param,
+        "sweet_param": "Baseline" if sweep_mode == "None" else sweep_mode,
         "v_ok": v_ok,
         "v_ok_numeric": int(v_ok),
         "val": val,
@@ -199,14 +145,48 @@ def generate_record(step: int, archetype, bias, student, teacher, sweep_mode="No
         "expansion_ratio": round(random.uniform(5.0, 50.0), 2),
         "punc_density": round(random.uniform(0.01, 0.1), 3),
         "unique_ratio": round(random.uniform(0.5, 1.0), 3),
-        "zipf_deviation": compute_zipf_deviation(output_text)
+        "zipf_deviation": compute_zipf_deviation(output_text),
+        # neuro fields
+        "neuro_rigidity": jitter(rigidity_val, 0.05),
+        "neuro_cognitive_load": jitter(COGNITIVE_LOAD[archetype], 0.2),
+        "neuro_coherence": jitter(0.5, 0.1),
+        "neuro_self_focus": jitter(SELF_FOCUS[archetype], 0.05),
+        "neuro_abstract_ratio_ext": jitter(0.1, 0.02),
+        "neuro_modality": jitter(0.1, 0.02),
+        "pos_adj": pos_distribution["ADJ"],
+        "pos_noun": pos_distribution["NOUN"],
+        "pos_verb": pos_distribution["VERB"],
     }
-    return record
+
+
+# --- Cluster generator for HDBSCAN visualizations ---
+def generate_cluster_dataset(
+    num_records=2000,
+    num_clusters=5,
+    cluster_spread=0.5,
+    noise_fraction=0.1,
+    feature_dim=6,
+    random_seed=42
+):
+    np.random.seed(random_seed)
+    data, labels = [], []
+    for cluster_id in range(num_clusters):
+        center = np.random.uniform(-5, 5, size=feature_dim)
+        points = center + cluster_spread * np.random.randn(
+            int(num_records * (1 - noise_fraction) / num_clusters), feature_dim
+        )
+        data.append(points)
+        labels.extend([cluster_id] * len(points))
+    noise_points = np.random.uniform(-10, 10, size=(int(num_records * noise_fraction), feature_dim))
+    data.append(noise_points)
+    labels.extend([-1] * len(noise_points))
+    data = np.vstack(data)
+    labels = np.array(labels)
 
 
 if __name__ == "__main__":
     single_teacher = True
-    output_file = "../results/dummy_gold.jsonl"
+    output_file = "../results/dummy_gold_clusters.jsonl"
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
 

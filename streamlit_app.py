@@ -14,6 +14,10 @@ import plotly.express as px
 import streamlit as st
 from loguru import logger
 from openai import OpenAI
+from sklearn.metrics import adjusted_rand_score
+from sklearn.metrics import davies_bouldin_score
+from sklearn.metrics import silhouette_score
+from umap import UMAP
 
 from core.analysis.model_evaluation import ModelEvaluation
 from core.rag.ingestion import RAGEngine
@@ -334,7 +338,7 @@ with st.sidebar.expander(" 📂 Upload data", expanded=False):
 # 3- 📈 Behavioral analytics
 # 4- 🧪 NLP features
 # 5- 🧩 Embedding clusters
-# 6- 🧬 LLM Evaluation
+# 6- 🧬 LLM evaluation
 # 7- 📑 Benchmark
 # 8- 🖥️ System monitor
 # 9- 🛠️ Debug << depends on the SHOW_DEBUG_TAB flag
@@ -348,7 +352,7 @@ tab_labels = [
     "📈 Behavioral analytics",
     "🧪 NLP features",
     "🧩 Embedding clusters",
-    "🧬 LLM Evaluation",
+    "🧬 LLM evaluation",
     "📑 Benchmark",
     "🖥️ System monitor",
 ]
@@ -416,7 +420,7 @@ seed = 42
 
 # ============================================================
 # TAB: Synthetic data
-# Full RAG-enabled Generation Pipeline
+# Full RAG-enabled generation pipeline
 # ============================================================
 
 with tab_gen:
@@ -451,7 +455,7 @@ with tab_gen:
         # 5. Teacher (Synced to st.session_state["teacher_model_key"])
         teacher_model = c2.selectbox(
             "Teacher (Judge)",
-            ["Select Teacher..."] + m_names,
+            ["Select teacher..."] + m_names,
             disabled=self_critic,
             key="teacher_model_key"
         )
@@ -467,7 +471,7 @@ with tab_gen:
         # ====================================================
 
         st.divider()
-        st.subheader("RAG Configuration")
+        st.subheader("RAG configuration")
         r1, r2, r3, r4 = st.columns([1, 1, 1, 2])
         rag_enabled = r1.checkbox(
             "Enable RAG",
@@ -485,7 +489,7 @@ with tab_gen:
         rag_mode = r3.selectbox(
             "Mode",
             [
-                "Archetype Only",
+                "Archetype ONLY",
                 "Archetype + Bias",
                 "Global"
             ],
@@ -527,7 +531,7 @@ with tab_gen:
         is_none = current_sweep == "None"
 
         with r[0]:
-            sweep_mode = st.selectbox("Mode", ["Delta", "Min-Max"], disabled=is_none, key="sweep_mode")
+            sweep_mode = st.selectbox("Mode", ["Delta", "MIN-MAX"], disabled=is_none, key="sweep_mode")
 
         # 1. Capture the base value (center)
         center = {
@@ -543,7 +547,7 @@ with tab_gen:
                 delta = st.number_input("Delta", 0.0, 1.0, 0.2, 0.05, disabled=is_none)
                 v_min, v_max = (center - delta), (center + delta)
             else:
-                # Min-Max Range Slider with 0.05 step
+                # MIN-MAX Range Slider with 0.05 step
                 m_range = st.slider("Range", 0.0, 2.0, (max(0.0, center - 0.2), min(2.0, center + 0.2)), step=0.05,
                                     disabled=is_none)
                 v_min, v_max = m_range
@@ -552,7 +556,7 @@ with tab_gen:
             steps = st.number_input("Steps", 1, 20, 3, disabled=is_none)
 
         # --- ASC/DESC checkboxes in individual columns for one-line look ---
-        sort_disabled = is_none or sweep_mode == "Min-Max"
+        sort_disabled = is_none or sweep_mode == "MIN-MAX"
 
         with r[3]:
             st.write(" ")  # Padding
@@ -608,18 +612,15 @@ with tab_gen:
     # ========================================================
     # EXPERIMENT DATA
     # ========================================================
-    # Load archetypes
     app_utils = AppUtils()
     ARCHETYPES = app_utils.load_archetypes(sys_prompts_defined_file_path)
 
     with st.expander("Experiment data", expanded=st.session_state.exp_expanded):
         c_in, c_out = st.columns(2)
         with c_in:
-            # 5. Archetypes (Synced to st.session_state["selected_archetypes"])
-            # Build UI list from archetype names
             selected_archetypes = st.multiselect(
                 "Archetypes",
-                [k for k in ARCHETYPES.keys() if k != "common"],  # exclude global phrases
+                [k for k in ARCHETYPES.keys() if k != "common"],
                 key="selected_archetypes"
             )
 
@@ -628,44 +629,20 @@ with tab_gen:
                 value="personalization, formal, toxic"
             )
 
-            # 6. Split biases (Synced to st.session_state["split_biases"])
-            split_biases = st.checkbox(
-                "Split biases",
-                key="split_biases"
-            )
-
-            # ------------------------------------------------
-            # PROMPT MASKING
-            # ------------------------------------------------
+            split_biases = st.checkbox("Split biases", key="split_biases")
 
             mask_disabled = (
-                    prompt_strategy ==
-                    "Blind mode (Hide label)"
-                    or
-                    prompt_strategy ==
-                    "Raw / No system prompt"
+                    prompt_strategy in ["Blind mode (Hide label)", "Raw / No system prompt"]
             )
-
             exclude_from_prompt = st.checkbox(
                 "Exclude archetype from prompt",
                 value=mask_disabled,
                 disabled=mask_disabled
             )
 
-            # ------------------------------------------------
-            # SYSTEM PROMPT PREVIEW
-            # ------------------------------------------------
-
             default_prompt = ""
-
             if selected_archetypes:
                 for archetype in selected_archetypes:
-                    arche_def = ARCHETYPES.get(archetype, {})
-                    sys_text = arche_def.get("sys_prompt", "")
-                    about_text = arche_def.get("about", "")
-
-                    display_name = "[HIDDEN]" if exclude_from_prompt else archetype
-
                     if prompt_strategy == "Behavioral conditioning (Tuned)":
                         default_prompt += (
                             f"{ARCHETYPES['common']['intro']} "
@@ -689,107 +666,85 @@ with tab_gen:
                 height=150
             )
 
-            # ------------------------------------------------
-            # VALIDATION
-            # ------------------------------------------------
-
+            # --- VALIDATION ---
             missing_params = []
-
             if not selected_archetypes:
                 missing_params.append("Archetypes")
-
             if not student_models:
                 missing_params.append("Students")
-
-            if (
-                    not self_critic
-                    and
-                    (
-                            not teacher_model
-                            or
-                            teacher_model == "Select Teacher..."
-                    )
-            ):
+            if not self_critic and (not teacher_model or teacher_model == "Select teacher..."):
                 missing_params.append("Teacher")
 
-            is_ready_to_run = (
-                    len(missing_params) == 0
-            )
+            is_ready_to_run = len(missing_params) == 0
+            if not is_ready_to_run and not st.session_state.is_running:
+                st.warning(f"Missing: {', '.join(missing_params)}")
 
-            if (
-                    not is_ready_to_run
-                    and
-                    not st.session_state.is_running
-            ):
-                st.warning(
-                    f"Missing: {', '.join(missing_params)}"
-                )
-
-            # ------------------------------------------------
-            # PLACEHOLDERS
-            # ------------------------------------------------
-
+            # --- PLACEHOLDERS ---
             stats_placeholder = st.empty()
             prog_placeholder = st.empty()
             log_placeholder = st.empty()
+            log_placeholder.markdown(render_console(), unsafe_allow_html=True)
 
-            log_placeholder.markdown(
-                render_console(),
-                unsafe_allow_html=True
+            # --- EXPERIMENT SUMMARY (always visible before run) ---
+            biases = [b.strip() for b in target_biases_raw.split(",")] if split_biases else [target_biases_raw]
+            total_tasks_preview = (
+                    len(student_models) * len(biases) * len(selected_archetypes) * len(val_range)
             )
 
-        # ====================================================
-        # RIGHT PANEL
-        # ====================================================
+            exp_summary = f"""
+    Total iterations for current setup: {total_tasks_preview}
+    Mode: {'SC' if self_critic else 'T-S'}
+    Teacher: {teacher_model}
+    Students: {', '.join(student_models)}
+    Prompt strategy: {prompt_strategy}
+    RAG configuration: {'Enabled' if rag_enabled else 'Disabled'}
+    RAG (Top-K): {rag_top_k if rag_enabled else 'NULL'}
+    RAG mode: {rag_mode if rag_enabled else 'NULL'}
+    Sweep parameter: {current_sweep}
+    Sweep parameter mode: {sweep_mode if not is_none else 'NULL'}
+    Sweep parameter range: {range_text}
+    ASC: {'Enabled' if asc else 'Disabled'}
+    DESC: {'Enabled' if desc else 'Disabled'}
+    Archetypes: {', '.join(selected_archetypes)}
+    Target biases: {target_biases_raw}
+    Target biases counter: {len(biases)}
+    Split biases: {'Enabled' if split_biases else 'Disabled'}
+    Exclude archetype from prompt: {'Enabled' if exclude_from_prompt else 'Disabled'}
+    System prompt: {sys_prompt}
+    """
+            st.text_area("Experiment setup", exp_summary.strip(), height=300)
 
+        # --- RIGHT PANEL ---
         with c_out:
-
-            st.subheader("JSONL Feed")
-
-            for item in reversed(
-                    st.session_state.history[-25:]
-            ):
-                label = (
-                    f"{item.get('batch')} | "
-                    f"{item.get('student')} | "
-                    f"OK: {item.get('v_ok')}"
-                )
-
+            st.subheader("JSONL feed")
+            for item in reversed(st.session_state.history[-25:]):
+                label = f"{item.get('batch')} | {item.get('student')} | OK: {item.get('v_ok')}"
                 with st.expander(label):
                     st.json(item)
 
     # ========================================================
     # CONTROL BUTTONS
     # ========================================================
-
     st.divider()
-
     b1, b2, b3 = st.columns([1, 1, 3])
 
     with b1:
-
         if st.button(
                 "Run generation",
-                disabled=(
-                        not is_ready_to_run
-                        or
-                        st.session_state.is_running
-                ),
-                width='stretch'
+                disabled=(not is_ready_to_run or st.session_state.is_running),
+                use_container_width=True
         ):
             st.session_state.is_running = True
             st.session_state.stop_requested = False
+            st.session_state.steps = 0
             st.rerun()
 
     with b2:
-
         if st.button(
                 "Stop generation",
-                disabled=(
-                        not st.session_state.is_running
-                ),
+                disabled=(not st.session_state.is_running),
                 on_click=trigger_stop,
-                width='stretch'
+                use_container_width=True
         ):
             st.rerun()
 
@@ -849,18 +804,25 @@ with tab_gen:
                             # PROGRESS
                             # --------------------------------
                             st.session_state.current_progress += 1
+                            percent = (st.session_state.current_progress / st.session_state.total_tasks) * 100
+
                             elapsed = time.strftime(
                                 "%H:%M:%S",
                                 time.gmtime(time.time() - start_batch_time)
                             )
 
                             current_summary = (
-                                f"Progress: {st.session_state.current_progress}/"
-                                f"{st.session_state.total_tasks} "
-                                f"| TYPE: {current_type} "
-                                f"| BIAS: {b_item} "
-                                f"| TIME: {elapsed}"
+                                f"Progress: {st.session_state.current_progress}/{st.session_state.total_tasks} "
+                                f"({percent:.1f}%) | TYPE: {current_type} | BIAS: {b_item} | TIME: {elapsed}"
                             )
+
+                            elapsed_seconds = time.time() - start_batch_time
+                            avg_iter_time = elapsed_seconds / max(1, st.session_state.current_progress)
+                            remaining_iters = st.session_state.total_tasks - st.session_state.current_progress
+                            est_remaining = avg_iter_time * remaining_iters
+                            est_remaining_str = time.strftime("%H:%M:%S", time.gmtime(est_remaining))
+
+                            current_summary += f" (completed ~ in {est_remaining_str})"
 
                             prog_placeholder.progress(
                                 st.session_state.current_progress / st.session_state.total_tasks
@@ -888,7 +850,7 @@ with tab_gen:
                                 rag_query = ""
 
                                 if rag_enabled and st.session_state.rag_engine:
-                                    if rag_mode == "Archetype Only":
+                                    if rag_mode == "Archetype ONLY":
                                         rag_query = current_type
                                     elif rag_mode == "Archetype + Bias":
                                         rag_query = f"{current_type} {b_item}"
@@ -1093,7 +1055,7 @@ with tab_perf:
     if df is None or df.empty:
         st.info("No experiment data found. Run a generation first or upload data set.")
     else:
-        # --- 1. Calculate General Metrics ---
+        # --- 1. Calculate general metrics---
         total_records = len(df)
 
         # Determine Sweep Info (using 'sweet_param' and 'val' from your JSONL)
@@ -1138,13 +1100,13 @@ with tab_perf:
         # 5. Final summary_data Dictionary
         summary_data = {
             "Metric": [
-                "Total Records",
+                "Total records",
                 "Steps",
-                "Sweep Parameter",
-                "Value Range",
-                "Estimated Processing Time",
-                "Avg. MS per Word",
-                "Avg. Validation Time",
+                "Sweep parameter",
+                "Value range",
+                "Estimated processing time",
+                "Avg. MS per word",
+                "Avg. validation time",
                 "teacher",
                 "student(s)",
                 "Prompt strategy",
@@ -1198,16 +1160,16 @@ with tab_analytics:
 
         # Define subtabs
         sub_tab_heatmap, sub_tab_high_dim, sub_tab_zipf = st.tabs([
-            "🔥 Adherence & Metrics",
-            "🌐 High-Dim Analytics",
-            "📊 Zipf Deviation"
+            "🔥 Adherence & metrics",
+            "🌐 High-Dim analytics",
+            "📊 Zipf deviation"
         ])
 
         # -------------------------------
-        # Subtab 1: Adherence & Metrics
+        # Subtab 1: Adherence & metrics
         # -------------------------------
         with sub_tab_heatmap:
-            st.subheader("🔥 Adherence Heatmap (By Parameter)")
+            st.subheader("🔥 Adherence heatmap (By parameter)")
             if 'val' in df.columns and 'v_ok_numeric' in df.columns:
                 pivot = df.pivot_table(
                     index='student',
@@ -1222,7 +1184,7 @@ with tab_analytics:
                 )
 
             st.plotly_chart(
-                px.pie(df, names='student', title="Workload Distribution", template="plotly_dark"),
+                px.pie(df, names='student', title="Workload Distribution", template="plotly_white"),
                 width='stretch'
             )
 
@@ -1232,13 +1194,13 @@ with tab_analytics:
             with col_p1:
                 st.plotly_chart(
                     px.box(df, x="student", y="duration_ms", color="student", title="Latency (ms)",
-                           template="plotly_dark"),
+                           template="plotly_white"),
                     width='stretch'
                 )
             with col_p2:
                 st.plotly_chart(
                     px.line(df, y="ms_per_word", color="student", title="Generation Velocity (ms/word)",
-                            template="plotly_dark"),
+                            template="plotly_white"),
                     width='stretch'
                 )
 
@@ -1248,13 +1210,13 @@ with tab_analytics:
             with col_v1:
                 st.plotly_chart(
                     px.line(df, y="word_count", color="student", markers=True, title="Word Count Consistency",
-                            template="plotly_dark"),
+                            template="plotly_white"),
                     width='stretch'
                 )
             with col_v2:
                 st.plotly_chart(
                     px.bar(df, x="student", y="unique_ratio", color="student", title="Vocabulary Diversity Ratio",
-                           template="plotly_dark"),
+                           template="plotly_white"),
                     width='stretch'
                 )
 
@@ -1288,14 +1250,14 @@ with tab_analytics:
                         color=color_col,
                         barmode="group",
                         title="Levenshtein Distance to Teacher",
-                        template="plotly_dark"
+                        template="plotly_white"
                     ),
                     width='stretch'
                 )
             with col_l2:
                 st.plotly_chart(
                     px.line(df, y="semantic_overlap", color="student", title="Semantic Alignment Overlap",
-                            template="plotly_dark"),
+                            template="plotly_white"),
                     width='stretch'
                 )
 
@@ -1303,45 +1265,45 @@ with tab_analytics:
             st.subheader("🎭 Psycholinguistic Signature")
             st.plotly_chart(
                 px.scatter(df, x="punc_density", y="expansion_ratio", color="archetype", symbol="student",
-                           size="word_count", title="Style Distribution (Raw Space)", template="plotly_dark"),
+                           size="word_count", title="Style Distribution (Raw space)", template="plotly_white"),
                 width='stretch'
             )
 
         # -------------------------------
-        # Subtab 2: High-Dim Analytics
+        # Subtab 2: High-Dim analytics
         # -------------------------------
         with sub_tab_high_dim:
-            st.subheader("🌐 Multi-Model Dependency Analytics")
+            st.subheader("🌐 Multi-model dependency analytics")
             required_cols = ['lexical_density', 'ms_per_word', 'cognitive_load']
             if all(col in df.columns for col in required_cols):
-                with st.spinner("Calculating Pipeline..."):
+                with st.spinner("Calculating pipeline..."):
                     figs = get_high_dim_dashboard(df)
 
-                st.write("#### 🔀 Logic Pipeline")
+                st.write("#### 🔀 Logic pipeline")
                 st.plotly_chart(figs[0], width='stretch', key="plot_logic_psy")
                 st.plotly_chart(figs[1], width='stretch', key="plot_logic_success")
 
-                st.write("#### 🏗️ Model Productivity Matrix")
+                st.write("#### 🏗️ Model productivity matrix")
                 st.plotly_chart(figs[2], width='stretch', key="plot_productivity")
 
-                st.write("#### 🧪 Dependency Matrices")
+                st.write("#### 🧪 Dependency matrices")
                 st.plotly_chart(figs[3], width='stretch', key="plot_matrix_teacher")
                 st.plotly_chart(figs[4], width='stretch', key="plot_matrix_cross")
             else:
                 st.warning(f"Missing columns: {[c for c in required_cols if c not in df.columns]}")
 
         # -------------------------------
-        # Subtab 3: Zipf Deviation
+        # Subtab 3: Zipf deviation
         # -------------------------------
         with sub_tab_zipf:
-            st.subheader("📊 Zipf Deviation Benchmarking")
+            st.subheader("📊 Zipf deviation benchmarking")
 
             if "zipf_deviation" in df.columns:
                 # Distribution per model
                 st.plotly_chart(
                     px.box(df, x="student", y="zipf_deviation", color="student",
-                           title="Zipf Deviation Distribution (Normalized)",
-                           template="plotly_dark"),
+                           title="Zipf deviation Distribution (Normalized)",
+                           template="plotly_white"),
                     width='stretch'
                 )
 
@@ -1349,8 +1311,8 @@ with tab_analytics:
                 if "archetype" in df.columns:
                     st.plotly_chart(
                         px.bar(df, x="archetype", y="zipf_deviation", color="student",
-                               barmode="group", title="Zipf Deviation by archetype",
-                               template="plotly_dark"),
+                               barmode="group", title="Zipf deviation by archetype",
+                               template="plotly_white"),
                         width='stretch'
                     )
             else:
@@ -1367,7 +1329,7 @@ with tab_analytics:
 with tab_nlp:
     st.subheader("🧪 Deep NLP Investigation (NLTK)")
     if st.session_state.history:
-        with st.spinner("Processing Scientific Metrics..."):
+        with st.spinner("Processing scientific metrics..."):
             # Use the Bridge to build the optimized DataFrame
             # This handles normalization, POS flattening, and numeric conversion
             full_df = LabDataBridge.build_dataframe(st.session_state.history)
@@ -1376,7 +1338,7 @@ with tab_nlp:
         # Layout for algorithms
         sub_tab_nlp_1, sub_tab_nlp_2, sub_tab_nlp_3 = st.tabs(["NLP-1", "NLP-2", "NLP-3"])
         with sub_tab_nlp_1:
-            # Row 1: POS Morphology Profile
+            # Row 1: POS Morphology profile
             # Note: 'Adjectives', 'Nouns', and 'Verbs' are created in LabDataBridge
             st.plotly_chart(px.scatter_ternary(
                 full_df,
@@ -1385,7 +1347,7 @@ with tab_nlp:
                 c="pos_verb",
                 color="archetype",
                 size="word_count",
-                title="POS Morphology Profile"
+                title="POS Morphology profile"
             ), width='stretch')
 
             # --- Row 2: Archetype Proofs ---
@@ -1394,7 +1356,7 @@ with tab_nlp:
 
             with col_a:
                 st.write(
-                    "**Cognitive Complexity (Readability vs Diversity)**")
+                    "**Cognitive complexity (Readability vs Diversity)**")
                 # Detacheds usually cluster top-right (High ARI, High TTR)
                 st.plotly_chart(px.scatter(
                     full_df, x="readability_ari", y="corrected_ttr",
@@ -1404,7 +1366,7 @@ with tab_nlp:
 
             with col_b:
                 st.write(
-                    "**Emotional Engagement (Subjectivity vs Sentiment)** ")
+                    "**Emotional engagement (Subjectivity vs Sentiment)** ")
                 st.plotly_chart(px.scatter(
                     full_df, x="subjectivity", y="sentiment",
                     color="archetype",
@@ -1413,7 +1375,7 @@ with tab_nlp:
                     facet_col="bias",
                     size_max=15,
                     # hover_data=["bias"],
-                    title="Bias & Polarity Analysis"
+                    title="Bias & Polarity analysis"
                 ), width='stretch')
 
         # --- Row 3: Psycholinguistic Signals ---
@@ -1422,7 +1384,7 @@ with tab_nlp:
 
             with col_c:
                 st.write(
-                    "**Emotional Stability (Sentiment Variance)**")
+                    "**Emotional stability (Sentiment variance)**")
 
                 st.plotly_chart(px.box(
                     full_df,
@@ -1430,11 +1392,11 @@ with tab_nlp:
                     y="sentiment_variance",
                     color="archetype",
                     points="all",
-                    title="Emotional Variability per archetype"
+                    title="Emotional variability per archetype"
                 ), width='stretch')
 
             with col_d:
-                st.write("**Repetition / Fixation Patterns**")
+                st.write("**Repetition / Fixation patterns**")
                 st.plotly_chart(px.box(
                     full_df,
                     x="bias",
@@ -1442,22 +1404,22 @@ with tab_nlp:
                     color="archetype",
                     points="all",
                     notched=True,
-                    title="Repetition Triggered by Bias Type"
+                    title="Repetition triggered by bias type"
                 ), width='stretch')
         with sub_tab_nlp_3:
             # --- Row 4: Sentence Structure ---
             st.write(
-                "**Syntactic Flow (Sentence Length Distribution)**")
+                "**Syntactic flow (Sentence length distribution)**")
             st.plotly_chart(px.box(
                 full_df, x="archetype", y="avg_sentence_length",
-                color="archetype", points="all", title="Sentence Length per archetype"
+                color="archetype", points="all", title="Sentence length per archetype"
             ), width='stretch')
 
-            # --- Row 5: Neuropsychological Metrics ---
+            # --- Row 5: Neuropsychological metrics ---
             st.divider()
             col_e, col_e_e = st.columns(2)
             with col_e:
-                st.write("**Self-Focus vs Cognitive Rigidity** ")
+                st.write("**Self-Focus vs Cognitive rigidity** ")
                 st.plotly_chart(px.scatter(
                     full_df,
                     x="neuro_self_focus",
@@ -1466,9 +1428,9 @@ with tab_nlp:
                     size="word_count",
                     # This is your Alias mapping
                     labels={
-                        "neuro_self_focus": "Self-Reference (I-Factor)",
-                        "rigidity": "Cognitive Rigidity (Fixation)",
-                        "archetype": "Archetype Cluster"
+                        "neuro_self_focus": "Self-reference (I-Factor)",
+                        "rigidity": "Cognitive rigidity (Fixation)",
+                        "archetype": "Archetype cluster"
                     },
                     hover_data=["bias", "student"],
                     title="Egocentricity vs Fixation"
@@ -1476,7 +1438,7 @@ with tab_nlp:
 
             with col_e_e:
                 st.write(
-                    "**Self-Focus vs Cognitive Rigidity (Bias Dependency)**")
+                    "**Self-Focus vs Cognitive rigidity  (Bias Dependency)**")
                 st.plotly_chart(px.scatter(
                     full_df,
                     x="neuro_self_focus",
@@ -1487,16 +1449,16 @@ with tab_nlp:
                     hover_data=["student", "val"],
                     labels={
                         "neuro_self_focus": "I-Factor",
-                        "rigidity": "Cognitive Rigidity (Fixation)",
-                        "archetype": "Archetype Cluster"
+                        "rigidity": "Cognitive rigidity (Fixation)",
+                        "archetype": "Archetype cluster"
                     },
-                    title="Egocentricity vs Fixation by Input Bias"
+                    title="Egocentricity vs Fixation by input bias"
                 ), width='stretch')
 
             st.divider()
             col_f, col_f_f = st.columns(2)
             with col_f:
-                st.write("**Rigidity Distribution by Bias Type** ")
+                st.write("**Rigidity distribution by bias type** ")
                 st.plotly_chart(px.box(
                     full_df,
                     x="bias",
@@ -1504,19 +1466,19 @@ with tab_nlp:
                     color="archetype",
                     points="all",
                     notched=True,
-                    title="Linguistic Rigidity: Impact of Bias",
+                    title="Linguistic rigidity : Impact of bias",
                     hover_data="student",
                 ), width='stretch')
 
             with col_f_f:
-                st.write("**Abstraction vs Cognitive Load** ")
+                st.write("**Abstraction vs Cognitive load** ")
                 st.plotly_chart(px.scatter(
                     full_df,
                     x="neuro_abstract_ratio_ext",
                     y="neuro_cognitive_load",
                     color="archetype",
                     size="word_count",
-                    title="Abstract Thinking vs Processing Load",
+                    title="Abstract thinking vs Processing load",
                     hover_data="student",
                 ), width='stretch')
 
@@ -1526,27 +1488,27 @@ with tab_nlp:
             col_g, col_h = st.columns(2)
 
             with col_g:
-                st.write("**Narrative Coherence Distribution** ")
+                st.write("**Narrative coherence distribution** ")
                 st.plotly_chart(px.box(
                     full_df,
                     x="archetype",
                     y="neuro_coherence",
                     color="archetype",
                     points="all",
-                    title="Logical Continuity per archetype",
+                    title="Logical continuity per archetype",
                     hover_data="student",
                 ), width='stretch')
 
             with col_h:
                 st.write(
-                    "**Emotional Volatility (Sentence Variance)**")
+                    "**Emotional volatility (sentence variance)**")
                 st.plotly_chart(px.box(
                     full_df,
                     x="archetype",
                     y="sentiment_variance",
                     color="archetype",
                     points="all",
-                    title="Emotional Stability per archetype",
+                    title="Emotional stability per archetype",
                     hover_data="student",
                 ), width='stretch')
     else:
@@ -1556,7 +1518,7 @@ with tab_nlp:
 #  Clustering
 # ============================================================
 with tab_clusters:
-    st.subheader("🧬 Multi-Dimensional Analysis")
+    st.subheader("🧬 Multi-dimensional analysis")
     if df is None or df.empty:
         st.info("No experiment data found. Run a generation first or upload data set.")
     else:
@@ -1568,9 +1530,9 @@ with tab_clusters:
             # 1. Configuration & Data Prep
             c1, c2 = st.columns([1, 2])
             with c1:
-                n_clusters = st.slider("Number of Clusters", 2, 8, 3)
+                n_clusters = st.slider("Number of clusters", 2, 8, 3)
             with c2:
-                # Allow user to toggle colors between Ground Truth and K-Means Clusters
+                # Allow user to toggle colors between Ground Truth and K-Means clusters
                 color_target = st.radio(
                     "Color Points By:", ["archetype", "cluster_id", "student", "v_ok"],
                     horizontal=True,
@@ -1602,8 +1564,8 @@ with tab_clusters:
                     color=color_target,
                     symbol='student',
                     hover_data=['archetype', 'bias', 'val', 'v_ok'],
-                    title=f"PCA Space: {color_target.capitalize()} distribution",
-                    template="plotly_dark",
+                    title=f"PCA space: {color_target.capitalize()} distribution",
+                    template="plotly_white",
                     color_discrete_sequence=px.colors.qualitative.Vivid
                 )
 
@@ -1612,7 +1574,7 @@ with tab_clusters:
                 fig.update_layout(height=600, legend_title_text='Legend')
                 st.plotly_chart(fig, width='stretch')
 
-                # 3. Visual Driver Analysis
+                # 3. Visual driver analysis
                 st.write("### 🚀 Axis Drivers Interpretation")
                 pc1_drivers, pc2_drivers = discovery.get_component_dependencies()
 
@@ -1637,15 +1599,15 @@ with tab_clusters:
                 with col_d2:
                     st.plotly_chart(plot_drivers(pc2_drivers, "Y-Axis (PC2)"), width='stretch')
 
-                # 4. Cluster Purity & Mapping
-                st.write("### 🧩 Cluster Purity (Ground Truth Mapping)")
+                # 4. Cluster purity & Mapping
+                st.write("### 🧩 Cluster purity (Ground Truth Mapping)")
                 if 'archetype' in df_clustered.columns:
                     purity_df = pd.crosstab(
                         df_clustered['cluster_id'],
                         df_clustered['archetype'],
                         normalize='index'
                     ) * 100
-                    st.caption("Percentage of each Archetype present within the machine-discovered Clusters:")
+                    st.caption("Percentage of each Archetype present within the machine-discovered clusters:")
                     st.dataframe(
                         purity_df.style.background_gradient(axis=1, cmap='YlGnBu').format("{:.1f}%"),
                         width='stretch'
@@ -1653,19 +1615,19 @@ with tab_clusters:
 
             except Exception as e:
                 st.error(f"K-Means Error: {e}")
-                st.info("Check if your history contains enough numeric metrics (Sentiment, Rigidity, etc.)")
+                st.info("Check if your history contains enough numeric metrics (Sentiment, rigidity, etc.)")
 
             st.divider()
 
         with sub_tab_hdbscan:
-            st.write("### 🌌 HDBSCAN Density Clustering")
+            st.write("### 🌌 HDBSCAN density clustering")
 
-            # 1. Setup Parameters
+            # 1. Setup parameters
             col_h1, col_h2 = st.columns(2)
             with col_h1:
-                min_size = st.number_input("Min Cluster Size", 2, 50, 5, key="hdb_min_size")
+                min_size = st.number_input("Min cluster size", 2, 50, 5, key="hdb_min_size")
             with col_h2:
-                min_samples = st.number_input("Min Samples (Noise control)", 1, 20, 1, key="hdb_min_samples")
+                min_samples = st.number_input("Min samples (noise control)", 1, 20, 1, key="hdb_min_samples")
 
             # 2. Extract and Scale
             numeric_data = df.select_dtypes(include=[np.number])
@@ -1673,6 +1635,10 @@ with tab_clusters:
 
             if clean_numeric.shape[0] > min_size:
                 scaled_data = StandardScaler().fit_transform(clean_numeric)
+                # Ensure cluster_id and cluster_name are scalars, not lists/dicts
+                for col in ["cluster_id", "Cluster name"]:
+                    if col in df.columns:
+                        df[col] = df[col].apply(lambda x: x if np.isscalar(x) else str(x))
 
                 # 3. HDBSCAN call with MST generation enabled
                 clusterer = hdbscan.HDBSCAN(
@@ -1685,33 +1651,33 @@ with tab_clusters:
                 hdb_labels = clusterer.fit_predict(scaled_data)
 
                 # 4. Create Tabs for different views
-                plot_tab1, plot_tab2 = st.tabs(["Clustering Scatter", "Minimum Spanning Tree"])
+                plot_tab1, plot_tab2 = st.tabs(["Clustering scatter", "Minimum spanning tree"])
 
                 with plot_tab1:
                     df_hdb = df_clustered.copy()
                     df_hdb['cluster_id'] = hdb_labels
-                    df_hdb['Cluster Name'] = df_hdb['cluster_id'].apply(
+                    df_hdb['Cluster name'] = df_hdb['cluster_id'].apply(
                         lambda x: "Noise" if x == -1 else f"Cluster {x}")
 
                     fig_hdb = px.scatter(
                         df_hdb, x='x', y='y',
-                        color='Cluster Name',
+                        color='Cluster name',
                         symbol='student',
                         title="HDBSCAN: Density-Based Groups",
                         hover_data=['archetype', 'bias'],
                         color_discrete_map={'Noise': '#7f8c8d'},
-                        template="plotly_dark"
+                        template="plotly_white"
                     )
                     st.plotly_chart(fig_hdb, width='stretch')
 
                 with plot_tab2:
                     st.write(
-                        "**Minimum Spanning Tree (MST) & Path Analysis**")
+                        "**Minimum spanning tree (MST) & Path analysis**")
 
                     # --- 1. Coloring Option ---
                     mst_color_mode = st.selectbox(
-                        "Color MST Nodes by:",
-                        ["Default (Density)", "Student Model", "Archetype"],
+                        "Color MST nodes by:",
+                        ["Default (Density)", "Student model", "Archetype"],
                         help="Identify if specific models or archetypes form isolated branches."
                     )
 
@@ -1734,7 +1700,7 @@ with tab_clusters:
                     # Note: MST uses internal indexing, so we align with our scaled_data
 
                     color_map_cols = {
-                        "Student Model": "student",
+                        "Student model": "student",
                         "Archetype": "archetype"
                     }
 
@@ -1760,28 +1726,28 @@ with tab_clusters:
 
                     st.pyplot(fig_mst)
 
-                # --- 3. Anomaly Analysis with Contrast Mode ---
-                st.write("### 🚩 Anomaly Analysis: High-Distance Outliers")
+                # --- 3. Anomaly analysis with contrast mode ---
+                st.write("### 🚩 anomaly analysis: High-distance outliers")
 
                 # Filter Noise points
                 outlier_df = df_hdb[df_hdb['cluster_id'] == -1].copy()
 
                 if not outlier_df.empty:
-                    # 1. Selection for Contrast Mode
+                    # 1. Selection for contrast mode
                     c_col1, c_col2 = st.columns([1, 2])
                     with c_col1:
-                        use_contrast = st.toggle("Enable Contrast Mode", help="Compare outliers to archetype averages")
+                        use_contrast = st.toggle("Enable contrast mode", help="Compare outliers to archetype averages")
 
                     # Identify numeric metrics for comparison (excluding coordinates)
                     metric_cols = [c for c in clean_numeric.columns if c not in ['x', 'y', 'cluster_id']]
 
                     if use_contrast:
-                        # Calculate Benchmarks (Global means per archetype)
+                        # Calculate benchmarks (Global means per archetype)
                         benchmarks = df_clustered.groupby('archetype')[metric_cols].mean()
 
                         # Select a specific outlier to inspect
                         selected_idx = st.selectbox(
-                            "Select Outlier to Contrast:",
+                            "Select outlier to contrast:",
                             outlier_df.index,
                             format_func=lambda
                                 x: f"ID: {x} | {outlier_df.loc[x, 'student']} | {outlier_df.loc[x, 'archetype']}"
@@ -1791,7 +1757,7 @@ with tab_clusters:
                         target_psych = target_row['archetype']
 
                         # 2. Build Comparison Table
-                        st.write(f"**Contrast: Outlier vs. {target_psych} Average**")
+                        st.write(f"**Contrast: outlier vs. {target_psych} Average**")
 
                         comparison_data = []
                         for m in metric_cols:
@@ -1814,14 +1780,9 @@ with tab_clusters:
                             width='stretch'
                         )
 
-                    # 3. General Outlier Feed
-                    st.write("**Full Outlier Datafeed:**")
+                    # 3. General outlier feed
+                    st.write("**Full outlier datafeed:**")
                     display_cols = ['student', 'archetype', 'bias', 'val', 'v_ok', 'output']
-                    # st.dataframe(
-                    #     outlier_df[display_cols].style.background_gradient(subset=['v_ok'], cmap='RdYlGn'),
-                    #     width='stretch',
-                    #     height=300
-                    # )
                     st.dataframe(
                         outlier_df[['student', 'archetype', 'step', 'output', 'v_ok']].astype(object),
                         width='stretch'
@@ -1836,45 +1797,45 @@ with tab_clusters:
                 # 5. Metrics
                 noise_count = len(df_hdb[df_hdb['cluster_id'] == -1])
                 total = len(df_hdb)
-                st.metric("Outliers (Noise Identified)", noise_count,
+                st.metric("Outliers (Noise identified)", noise_count,
                           delta=f"{(noise_count / total * 100):.1f}% of total", delta_color="inverse")
             else:
                 st.warning("Increase the number of data points to perform density clustering.")
 
         with sub_tab_hdbscan_UMAP:
-            st.write("### 🌌 Advanced Density Clustering (UMAP + HDBSCAN)")
+            st.write("### 🌌 Advanced density clustering (UMAP + HDBSCAN)")
             st.info("High-precision latent space analysis with automated noise filtering.")
 
             # --- 1. DATA PRE-FILTERING ---
             with st.expander("🛠️ Data Pre-filtering & Cleaning", expanded=False):
                 col_f1, col_f2 = st.columns(2)
                 with col_f1:
-                    min_len = st.number_input("Min Output Length", 0, 500, 20,
+                    min_len = st.number_input("Min output length", 0, 500, 20,
                                               help="Filters out very short or empty responses.")
                     filter_vok = st.toggle("Exclude v_ok == 0", value=True,
                                            help="Removes samples flagged as technically invalid.")
                 with col_f2:
-                    remove_json = st.toggle("Filter Raw JSON", value=True,
+                    remove_json = st.toggle("Filter raw JSON", value=True,
                                             help="Removes artifacts starting with {'text':")
                     exclude_keyword = st.text_input("Exclude by keyword", "",
                                                     help="Removes rows containing specific strings.")
 
             # --- 2. ADVANCED OPTIONS ---
-            with st.expander("⚙️ Clustering Engine Configuration", expanded=False):
+            with st.expander("⚙️ Clustering engine configuration", expanded=False):
                 col_h1, col_h2, col_h3 = st.columns(3)
                 with col_h1:
                     st.markdown("**Density (HDBSCAN)**")
-                    min_size = st.number_input("Min Cluster Size", 2, 50, 5, key="umap_v3_msize")
+                    min_size = st.number_input("Min cluster size", 2, 50, 5, key="umap_v3_msize")
                     min_samples = st.number_input("Min Samples", 1, 20, 1, key="umap_v3_msamp")
                 with col_h2:
                     st.markdown("**Projection (UMAP)**")
                     n_neighbors = st.slider("Neighbors", 2, 50, 15, key="umap_v3_neigh")
-                    min_dist = st.slider("Min Distance", 0.0, 0.5, 0.1, 0.05, key="umap_v3_dist")
+                    min_dist = st.slider("Min distance", 0.0, 0.5, 0.1, 0.05, key="umap_v3_dist")
                 with col_h3:
                     st.markdown("**Visuals**")
                     mst_color_mode = st.selectbox(
                         "Color Nodes By:",
-                        ["Default (Density)", "Student Model", "Archetype"],
+                        ["Default (Density)", "Student model", "Archetype"],
                         key="umap_v3_color"
                     )
 
@@ -1910,27 +1871,25 @@ with tab_clusters:
                     df_hdb = df_clean.copy()
                     df_hdb['x_umap'], df_hdb['y_umap'] = umap_embedding[:, 0], umap_embedding[:, 1]
                     df_hdb['cluster_id'] = hdb_labels
-                    df_hdb['Cluster Name'] = df_hdb['cluster_id'].apply(
+                    df_hdb['Cluster name'] = df_hdb['cluster_id'].apply(
                         lambda x: "Noise" if x == -1 else f"Cluster {x}")
 
                     # --- 4. VISUALIZATION EXPANDER ---
-                    with st.expander("📊 Latent Space & Path Analysis (MST)", expanded=True):
-                        v_tab1, v_tab2 = st.tabs(["Scatter Map", "Minimum Spanning Tree"])
+                    with st.expander("📊 Latent  contrast &  Path analysis (MST)", expanded=True):
+                        v_tab1, v_tab2 = st.tabs(["Scatter map", "Minimum spanning tree"])
                         with v_tab1:
-                            color_col = "Cluster Name" if mst_color_mode == "Default (Density)" else (
-                                "student" if mst_color_mode == "Student Model" else "archetype"
+                            color_col = "Cluster name" if mst_color_mode == "Default (Density)" else (
+                                "student" if mst_color_mode == "Student model" else "archetype"
                             )
                             fig = px.scatter(df_hdb, x='x_umap', y='y_umap', color=color_col, symbol='student',
                                              hover_data=['archetype', 'bias', 'step', 'output'],
-                                             template="plotly_dark", title="UMAP Space")
+                                             template="plotly_white", title="UMAP space")
                             st.plotly_chart(fig, width='stretch')
 
                         with v_tab2:
-                            #
-
                             fig_mst, ax_mst = plt.subplots(figsize=(12, 8))
-                            fig_mst.patch.set_facecolor('#0e1117')
-                            ax_mst.set_facecolor('#0e1117')
+                            fig_mst.patch.set_facecolor('white')
+                            ax_mst.set_facecolor('white')
                             if len(df):
                                 clusterer.minimum_spanning_tree_.plot(axis=ax_mst, node_size=0, edge_alpha=0.4,
                                                                       edge_cmap='viridis', edge_linewidth=1.5,
@@ -1938,7 +1897,7 @@ with tab_clusters:
                             else:
                                 st.warning("Dataset too small for MST projection (need >32 samples).")
 
-                            target_col = "student" if mst_color_mode == "Student Model" else "archetype"
+                            target_col = "student" if mst_color_mode == "Student model" else "archetype"
                             if mst_color_mode != "Default (Density)" and target_col in df_hdb.columns:
                                 for val in df_hdb[target_col].unique():
                                     m = df_hdb[target_col] == val
@@ -1961,7 +1920,7 @@ with tab_clusters:
                             st.pyplot(fig_mst)
 
                     # --- MODEL FIT INDICES ---
-                    st.write("### 📐 Model Fit Indices (Confirmatory Analysis)")
+                    st.write("### 📐 Model fit indices (Confirmatory analysis)")
                     fit_col1, fit_col2, fit_col3 = st.columns(3)
                     try:
                         from sklearn.metrics import silhouette_score, davies_bouldin_score, adjusted_rand_score
@@ -1974,23 +1933,23 @@ with tab_clusters:
                                         delta="Good" if sil_score > 0.4 else "Weak")
                         fit_col2.metric("RMSEA (DBI)", f"{dbi_score:.3f}",
                                         delta="Valid" if dbi_score < 1.5 else "Noisy", delta_color="inverse")
-                        fit_col3.metric("Label Alignment (ARI)", f"{ari_score:.3f}")
+                        fit_col3.metric("Label alignment (ARI)", f"{ari_score:.3f}")
                     except:
                         pass
 
                     # --- 5. ANOMALY ANALYSIS ---
                     outlier_df = df_hdb[df_hdb['cluster_id'] == -1].copy()
                     if not outlier_df.empty:
-                        with st.expander(f"🚩 Behavioral Anomaly Analysis ({len(outlier_df)} Outliers)", expanded=False):
-                            use_contrast = st.toggle("Enable Contrast Mode", key="v3_contrast_toggle")
+                        with st.expander(f"🚩 Behavioral anomaly analysis ({len(outlier_df)} outliers)", expanded=False):
+                            use_contrast = st.toggle("Enable contrast mode", key="v3_contrast_toggle")
 
                             with st.expander(f"🔍 Summary: {len(outlier_df)} non-standard responses", expanded=True):
                                 col_a1, col_a2 = st.columns([1, 2])
                                 with col_a1:
-                                    st.metric("Outlier Rate", f"{(len(outlier_df) / len(df_hdb) * 100):.1f}%", )
+                                    st.metric("Outlier rate", f"{(len(outlier_df) / len(df_hdb) * 100):.1f}%", )
                                     st.bar_chart(outlier_df['student'].value_counts())
                                 with col_a2:
-                                    selected_id = st.selectbox("Select Outlier to Inspect:", outlier_df.index,
+                                    selected_id = st.selectbox("Select outlier to inspect:", outlier_df.index,
                                                                key="v3_anom_sel")
                                     target_row = outlier_df.loc[selected_id]
                                     if use_contrast:
@@ -2005,7 +1964,7 @@ with tab_clusters:
                                             f"**Persona:** {target_row['archetype']} | **Model:** {target_row['student']}")
                                         st.info(f"**Output:** {target_row['output']}")
                             ##############
-                            with st.expander("📋 Full Outlier Datafeed", expanded=False):
+                            with st.expander("📋 Full outlier datafeed", expanded=False):
                                 st.dataframe(
                                     outlier_df[['student', 'archetype', 'step', 'output', 'v_ok']].astype(object),
                                     width='stretch')
@@ -2018,7 +1977,7 @@ with tab_clusters:
                 st.warning("Insufficient data points after filtering.")
 
         with sub_tab_hdbscan_UMAP_2:
-            st.write("### 🌌 Advanced Density Clustering (UMAP + HDBSCAN)")
+            st.write("### 🌌 Advanced density clustering (UMAP + HDBSCAN)")
             st.info(
                 "UMAP helps separate 'collapsed' data, highlighting the unique behavioral fingerprint of each model.")
 
@@ -2026,20 +1985,20 @@ with tab_clusters:
             # Unique keys used to prevent StreamlitDuplicateElementKey errors
             col_h1, col_h2, col_h3 = st.columns(3)
             with col_h1:
-                min_size = st.number_input("Min Cluster Size", 2, 50, 5, key="umap_hdb_min_size_old")
+                min_size = st.number_input("Min cluster size", 2, 50, 5, key="umap_hdb_min_size_old")
                 min_samples = st.number_input("Min Samples (Noise)", 1, 20, 1, key="umap_hdb_min_samples_old")
             with col_h2:
                 st.write("**UMAP Projection**")
                 n_neighbors = st.slider("Neighbors (Local vs Global)", 2, 50, 15,
                                         key="umap_n_neighbors_old",
                                         help="Lower = focus on model differences. Higher = focus on global structure.")
-                min_dist = st.slider("Min Distance", 0.0, 0.5, 0.1, 0.05,
+                min_dist = st.slider("Min distance", 0.0, 0.5, 0.1, 0.05,
                                      key="umap_min_dist_old",
                                      help="Packing density of points.")
             with col_h3:
                 mst_color_mode = st.selectbox(
                     "Color MST Nodes by:",
-                    ["Default (Density)", "Student Model", "Archetype"],
+                    ["Default (Density)", "Student model", "Archetype"],
                     key="umap_mst_color_mode_old"
                 )
 
@@ -2080,17 +2039,17 @@ with tab_clusters:
                     df_hdb['x_umap'] = umap_embedding[:, 0]
                     df_hdb['y_umap'] = umap_embedding[:, 1]
                     df_hdb['cluster_id'] = hdb_labels
-                    df_hdb['Cluster Name'] = df_hdb['cluster_id'].apply(
+                    df_hdb['Cluster name'] = df_hdb['cluster_id'].apply(
                         lambda x: "Noise (Anomaly)" if x == -1 else f"Cluster {x}"
                     )
 
                     # --- 3. VISUALIZATION TABS ---
-                    plot_tab1, plot_tab2 = st.tabs(["Clustering Scatter", "Minimum Spanning Tree"])
+                    plot_tab1, plot_tab2 = st.tabs(["Clustering scatter", "Minimum spanning tree"])
 
                     with plot_tab1:
                         # Selecting color column based on UI selection
-                        color_col = "Cluster Name"
-                        if mst_color_mode == "Student Model":
+                        color_col = "Cluster name"
+                        if mst_color_mode == "Student model":
                             color_col = "student"
                         elif mst_color_mode == "Archetype":
                             color_col = "archetype"
@@ -2099,15 +2058,15 @@ with tab_clusters:
                             df_hdb, x='x_umap', y='y_umap',
                             color=color_col,
                             symbol='student' if 'student' in df_hdb.columns else None,
-                            title="UMAP + HDBSCAN: Latent Space Distribution",
+                            title="UMAP + HDBSCAN: Latent space distribution",
                             hover_data=['archetype', 'bias', 'val'] if 'archetype' in df_hdb.columns else None,
-                            template="plotly_dark",
+                            template="plotly_white",
                             color_discrete_sequence=px.colors.qualitative.Vivid
                         )
                         st.plotly_chart(fig_hdb, width='stretch')
 
                     with plot_tab2:
-                        st.write("**Minimum Spanning Tree (Path Analysis)**")
+                        st.write("**Minimum spanning tree (Path analysis)**")
 
                         fig_mst, ax_mst = plt.subplots(figsize=(12, 8))
                         fig_mst.patch.set_facecolor('#0e1117')
@@ -2123,7 +2082,7 @@ with tab_clusters:
                             st.warning("Dataset too small for MST projection (need >32 samples).")
                         # Overlaying colored nodes
                         if mst_color_mode != "Default (Density)":
-                            target_col = "student" if mst_color_mode == "Student Model" else "archetype"
+                            target_col = "student" if mst_color_mode == "Student model" else "archetype"
                             if target_col in df_hdb.columns:
                                 unique_vals = df_hdb[target_col].unique()
                                 for val in unique_vals:
@@ -2144,23 +2103,23 @@ with tab_clusters:
                     outlier_df = df_hdb[df_hdb['cluster_id'] == -1].copy()
 
                     if not outlier_df.empty:
-                        st.subheader("🚩 Behavioral Anomaly Analysis")
+                        st.subheader("🚩 Behavioral anomaly analysis")
                         st.write(f"Detected **{len(outlier_df)}** responses that do not fit into any standard cluster.")
 
                         col_anom1, col_anom2 = st.columns([1, 2])
                         with col_anom1:
                             # Anomaly rate metric
                             total_pts = len(df_hdb)
-                            st.metric("Outlier Rate", f"{(len(outlier_df) / total_pts * 100):.1f}%",
-                                      help="A high rate might suggest too strict 'Min Cluster Size' parameters.")
+                            st.metric("Outlier rate", f"{(len(outlier_df) / total_pts * 100):.1f}%",
+                                      help="A high rate might suggest too strict 'Min cluster size' parameters.")
 
-                            st.write("**Outliers by Model:**")
+                            st.write("**Outliers by model:**")
                             st.bar_chart(outlier_df['student'].value_counts())
 
                         with col_anom2:
                             st.write("**Detailed Anomaly Inspector:**")
                             selected_id = st.selectbox(
-                                "Select Outlier ID to contrast:",
+                                "Select outlier ID to contrast:",
                                 outlier_df.index,
                                 format_func=lambda
                                     x: f"ID: {x} | {outlier_df.loc[x, 'student']} | {outlier_df.loc[x, 'archetype']}"
@@ -2187,7 +2146,7 @@ with tab_clusters:
                             st.table(pd.DataFrame(diff_data).set_index("Metric").T)
 
                         # Full datafeed for inspection
-                        st.write("**Full Outlier Datafeed:**")
+                        st.write("**Full outlier datafeed:**")
                         display_cols = ['student', 'archetype', 'bias', 'val', 'v_ok', 'output']
                         st.dataframe(
                             outlier_df[display_cols].style.background_gradient(subset=['v_ok'], cmap='RdYlGn'),
@@ -2204,7 +2163,7 @@ with tab_clusters:
                 st.warning("Insufficient data for HDBSCAN. Please add more records.")
 
         with sub_tab_behavioral_topology:
-            st.subheader("🧠 Behavioral Topology Lab")
+            st.subheader("🧠 Behavioral topology lab")
             st.caption(
                 "Academic-style latent space analysis for behavioral response clustering, topology exploration, anomaly detection, and model conditioning evaluation."
             )
@@ -2226,13 +2185,13 @@ with tab_clusters:
                     topology_tab_anomaly,
                     topology_tab_fit
                 ) = st.tabs([
-                    "⚙️ Engine Configuration",
-                    "📍 Latent Projection",
-                    "🌐 HDBSCAN Topology",
-                    "🧩 Cluster Membership",
-                    "🧪 Research Mode",
-                    "🚩 Behavioral Anomalies",
-                    "📐 Fit Indices"
+                    "⚙️ Engine configuration",
+                    "📍 Latent projection",
+                    "🌐 HDBSCAN topology",
+                    "🧩 Cluster nembership",
+                    "🧪 Research mode",
+                    "🚩 Behavioral anomalies",
+                    "📐 Fit indices"
                 ])
 
                 # ============================================================
@@ -2288,11 +2247,11 @@ with tab_clusters:
                 # ============================================================
                 with topology_tab_engine:
 
-                    st.write("### ⚙️ Analysis Engine Configuration")
+                    st.write("### ⚙️ Analysis engine configuration")
 
-                    with st.expander("🧬 Feature Space", expanded=True):
+                    with st.expander("🧬 Feature space", expanded=True):
                         selected_groups = st.multiselect(
-                            "Feature Groups",
+                            "Feature groups",
                             list(FEATURE_GROUPS.keys()),
                             default=["Behavioral", "Linguistic"]
                         )
@@ -2307,14 +2266,14 @@ with tab_clusters:
                         ]
 
                         selected_features = st.multiselect(
-                            "Selected Features",
+                            "Selected features",
                             selected_features,
                             default=selected_features
                         )
 
                         st.session_state.bt_selected_features = selected_features
 
-                    with st.expander("🧹 Data Filtering", expanded=False):
+                    with st.expander("🧹 Data filtering", expanded=False):
                         bt_filter_vok = st.toggle(
                             "Exclude invalid samples (v_ok == 0)",
                             value=True,
@@ -2350,7 +2309,7 @@ with tab_clusters:
                             key="bt_remove_duplicates"
                         )
 
-                    with st.expander("📍 Projection Space (Visualization)", expanded=False):
+                    with st.expander("📍 Projection space (Visualization)", expanded=False):
                         bt_vis_neighbors = st.slider(
                             "Visualization Neighbors",
                             2,
@@ -2360,7 +2319,7 @@ with tab_clusters:
                         )
 
                         bt_vis_min_dist = st.slider(
-                            "Visualization Min Distance",
+                            "Visualization MIN distance",
                             0.0,
                             1.0,
                             0.1,
@@ -2368,7 +2327,7 @@ with tab_clusters:
                             key="bt_vis_min_dist"
                         )
 
-                    with st.expander("🌐 Density Space (Clustering)", expanded=False):
+                    with st.expander("🌐 Density space (Clustering)", expanded=False):
                         bt_cluster_neighbors = st.slider(
                             "Clustering Neighbors",
                             2,
@@ -2386,7 +2345,7 @@ with tab_clusters:
                         )
 
                         bt_min_cluster_size = st.slider(
-                            "Min Cluster Size",
+                            "Min cluster size",
                             2,
                             100,
                             10,
@@ -2404,12 +2363,6 @@ with tab_clusters:
                 # ============================================================
                 # DATA PREPARATION
                 # ============================================================
-                from sklearn.preprocessing import StandardScaler
-                from sklearn.metrics import silhouette_score
-                from sklearn.metrics import davies_bouldin_score
-                from sklearn.metrics import adjusted_rand_score
-
-                from umap import UMAP
 
                 bt_df = df.copy()
 
@@ -2449,6 +2402,11 @@ with tab_clusters:
 
                 numeric_df = bt_df[feature_cols].copy()
                 numeric_df = numeric_df.replace([np.inf, -np.inf], np.nan).fillna(0)
+
+                # Ensure cluster_id and cluster_name are scalars, not lists/dicts
+                for col in ["cluster_id", "cluster_name"]:
+                    if col in bt_df.columns:
+                        bt_df[col] = bt_df[col].apply(lambda x: x if np.isscalar(x) else str(x))
 
                 scaler = StandardScaler()
                 scaled_data = scaler.fit_transform(numeric_df)
@@ -2504,7 +2462,7 @@ with tab_clusters:
                 # ============================================================
                 with topology_tab_projection:
 
-                    st.write("### 📍 Latent Projection Space")
+                    st.write("### 📍 Latent Projection space")
 
                     with st.expander("📊 Projection Controls", expanded=False):
                         projection_color = st.selectbox(
@@ -2544,8 +2502,8 @@ with tab_clusters:
                             "word_count",
                             "coherence"
                         ],
-                        template="plotly_dark",
-                        title="UMAP Projection Space"
+                        template="plotly_white",
+                        title="UMAP Projection space"
                     )
 
                     fig_projection.update_traces(
@@ -2558,7 +2516,7 @@ with tab_clusters:
 
                     c1.metric("Samples", len(bt_df))
                     c2.metric("Clusters", len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0))
-                    c3.metric("Outlier Rate", f"{(len(outlier_df) / len(bt_df) * 100):.1f}%")
+                    c3.metric("Outlier rate", f"{(len(outlier_df) / len(bt_df) * 100):.1f}%")
                     c4.metric("Features", len(feature_cols))
 
                 # ============================================================
@@ -2566,55 +2524,107 @@ with tab_clusters:
                 # ============================================================
                 with topology_tab_hdbscan:
 
-                    st.write("### 🌐 HDBSCAN Topology Space")
+                    st.write("### 🌐 HDBSCAN topology space")
                     st.caption(
-                        "Topology visualization is displayed separately from UMAP projection to preserve academic correctness.")
+                        "Topology visualization is displayed separately from UMAP projection to preserve academic correctness."
+                    )
 
-                    topology_subtab_mst, topology_subtab_condensed = st.tabs([
-                        "Minimum Spanning Tree",
+                    topology_subtab_sm, topology_subtab_mst, topology_subtab_condensed = st.tabs([
+                        "Scatter map", "Minimum spanning tree",
                         "Condensed Tree"
                     ])
+
+                    with topology_subtab_sm:
+                        st.write("**Scatter map: Behavioral topology**")
+
+                        # Проверяем, что есть координаты для отображения
+                        if "x" in df_clustered.columns and "y" in df_clustered.columns:
+                            # Цветовая схема: можно переключать между Cluster name, archetype, student
+                            color_col = st.selectbox(
+                                "Color points by:",
+                                ["Cluster name", "archetype", "student"],
+                                index=0
+                            )
+
+                            # Создаём копию с метками кластеров
+                            df_hdb = df_clustered.copy()
+                            if "cluster_id" not in df_hdb.columns:
+                                df_hdb["cluster_id"] = hdb_labels
+                            df_hdb["Cluster name"] = df_hdb["cluster_id"].apply(
+                                lambda x: "Noise" if x == -1 else f"Cluster {x}"
+                            )
+
+                            fig_scatter = px.scatter(
+                                df_hdb,
+                                x="x", y="y",
+                                color=color_col if color_col in df_hdb.columns else "Cluster name",
+                                symbol="student" if "student" in df_hdb.columns else None,
+                                hover_data=["archetype", "bias", "step",
+                                            "output"] if "archetype" in df_hdb.columns else None,
+                                template="plotly_white",
+                                title="Behavioral topology scatter map"
+                            )
+
+                            fig_scatter.update_traces(
+                                marker=dict(size=9, opacity=0.75, line=dict(width=1, color="rgba(255,255,255,0.5)"))
+                            )
+                            fig_scatter.update_layout(height=600, legend_title_text="Legend")
+                            st.plotly_chart(fig_scatter, width="stretch")
+                        else:
+                            st.warning("No coordinates found in DataFrame (x, y). Run clustering first.")
 
                     with topology_subtab_mst:
                         fig_mst, ax_mst = plt.subplots(figsize=(12, 8))
                         fig_mst.patch.set_facecolor('#0e1117')
                         ax_mst.set_facecolor('#0e1117')
 
-                        clusterer.minimum_spanning_tree_.plot(
-                            axis=ax_mst,
-                            node_size=0,
-                            edge_alpha=0.5,
-                            edge_cmap='viridis',
-                            edge_linewidth=1.5,
-                            vary_line_width=True
-                        )
-
-                        ax_mst.axis('off')
-                        st.pyplot(fig_mst)
+                        try:
+                            if hasattr(clusterer,
+                                       "minimum_spanning_tree_") and clusterer.minimum_spanning_tree_ is not None:
+                                clusterer.minimum_spanning_tree_.plot(
+                                    axis=ax_mst,
+                                    node_size=0,
+                                    edge_alpha=0.5,
+                                    edge_cmap='viridis',
+                                    edge_linewidth=1.5,
+                                    vary_line_width=True
+                                )
+                            else:
+                                st.warning("No MST generated (dataset too small or clustering skipped).")
+                            ax_mst.axis('off')
+                            st.pyplot(fig_mst)
+                        except Exception as e:
+                            st.warning(f"MST plot failed: {e}")
 
                     with topology_subtab_condensed:
                         fig_condensed, ax_condensed = plt.subplots(figsize=(12, 8))
                         fig_condensed.patch.set_facecolor('#0e1117')
                         ax_condensed.set_facecolor('#0e1117')
 
-                        clusterer.condensed_tree_.plot(
-                            select_clusters=True,
-                            axis=ax_condensed
-                        )
-
-                        st.pyplot(fig_condensed)
+                        try:
+                            if hasattr(clusterer, "condensed_tree_") and clusterer.condensed_tree_ is not None:
+                                # sanitize before plotting
+                                clusterer.condensed_tree_.plot(
+                                    select_clusters=True,
+                                    axis=ax_condensed
+                                )
+                                st.pyplot(fig_condensed)
+                            else:
+                                st.warning("No condensed tree generated (dataset too small or clustering skipped).")
+                        except Exception as e:
+                            st.warning(f"Condensed tree plot failed: {e}")
 
                 # ============================================================
                 # TAB 3 — CLUSTER MEMBERSHIP
                 # ============================================================
                 with topology_tab_membership:
 
-                    st.write("### 🧩 Cluster Membership Analysis")
+                    st.write("### 🧩 Cluster membership analysis")
 
                     membership_tab_1, membership_tab_2, membership_tab_3 = st.tabs([
-                        "Archetype Distribution",
-                        "Model Distribution",
-                        "Feature Centroids"
+                        "Archetype distribution",
+                        "Model distribution",
+                        "Feature centroids"
                     ])
 
                     with membership_tab_1:
@@ -2659,29 +2669,29 @@ with tab_clusters:
                 # ============================================================
                 with topology_tab_research:
 
-                    st.write("### 🧪 Research Sandbox")
+                    st.write("### 🧪 Research sandbox")
 
-                    with st.expander("📊 Raw Feature Correlations", expanded=False):
+                    with st.expander("📊 Raw feature correlations", expanded=False):
                         corr_df = bt_df[feature_cols].corr(numeric_only=True)
 
                         fig_corr = px.imshow(
                             corr_df,
-                            template="plotly_dark",
+                            template="plotly_white",
                             color_continuous_scale="RdBu_r",
-                            title="Feature Correlation Matrix"
+                            title="Feature correlation matrix"
                         )
 
                         st.plotly_chart(fig_corr, width="stretch")
 
-                    with st.expander("📍 Cluster Scatter by Feature", expanded=False):
+                    with st.expander("📍 Cluster scatter by feature", expanded=False):
                         x_feature = st.selectbox(
-                            "X Feature",
+                            "X feature",
                             feature_cols,
                             key="bt_research_x"
                         )
 
                         y_feature = st.selectbox(
-                            "Y Feature",
+                            "Y feature",
                             feature_cols,
                             key="bt_research_y"
                         )
@@ -2692,7 +2702,7 @@ with tab_clusters:
                             y=y_feature,
                             color="cluster_name",
                             symbol="student",
-                            template="plotly_dark"
+                            template="plotly_white"
                         )
 
                         st.plotly_chart(fig_feature, width="stretch")
@@ -2702,20 +2712,20 @@ with tab_clusters:
                 # ============================================================
                 with topology_tab_anomaly:
 
-                    st.write("### 🚩 Behavioral Anomaly Analysis")
+                    st.write("### 🚩 Behavioral anomaly analysis")
 
                     outlier_rate = (len(outlier_df) / len(bt_df) * 100)
 
                     c1, c2 = st.columns([1, 2])
 
                     with c1:
-                        st.metric("Outlier Rate", f"{outlier_rate:.1f}%")
+                        st.metric("Outlier rate", f"{outlier_rate:.1f}%")
                         st.bar_chart(outlier_df["student"].value_counts())
 
                     with c2:
                         if not outlier_df.empty:
                             selected_outlier = st.selectbox(
-                                "Select Outlier",
+                                "Select outlier",
                                 outlier_df.index,
                                 key="bt_selected_outlier"
                             )
@@ -2729,7 +2739,7 @@ with tab_clusters:
 
                             st.info(target_row["output"])
 
-                    with st.expander("📋 Full Outlier Feed", expanded=False):
+                    with st.expander("📋 Full outlier feed", expanded=False):
                         st.dataframe(
                             outlier_df[
                                 [
@@ -2752,7 +2762,7 @@ with tab_clusters:
                 # ============================================================
                 with topology_tab_fit:
 
-                    st.write("### 📐 Clustering Fit Indices")
+                    st.write("### 📐 Clustering fit indices")
 
                     fit_c1, fit_c2, fit_c3, fit_c4 = st.columns(4)
 
@@ -2778,35 +2788,45 @@ with tab_clusters:
                         noise_ratio = (len(outlier_df) / len(bt_df)) * 100
 
                         fit_c1.metric(
-                            "Silhouette",
-                            f"{sil_score:.3f}"
+                            "CFI (Silhouette)",
+                            f"{sil_score:.3f}",
+                            delta="Good" if sil_score > 0.4 else "Weak",
+                            delta_color="inverse",
+                            help="Good if > 0.4"
                         )
 
                         fit_c2.metric(
                             "Davies-Bouldin",
-                            f"{db_score:.3f}"
+                            f"{db_score:.3f}",
+                            delta="Good" if db_score < 1.0 else "Weak",
+                            delta_color = "inverse",
+                            help="Good if < 1.0"
                         )
 
                         fit_c3.metric(
-                            "ARI",
-                            f"{ari_score:.3f}"
+                            "Label alignment (ARI)",
+                            f"{ari_score:.3f}",
+                            delta="Good" if ari_score > 0.5 else "Weak",
+                            delta_color = "inverse",
+                            help="Good if > 0.5"
                         )
 
                         fit_c4.metric(
                             "Noise Ratio",
-                            f"{noise_ratio:.1f}%"
+                            f"{noise_ratio:.1f}%",
+                            delta="Good" if noise_ratio < 30 else "Weak",
+                            help="Good if < 30%"
                         )
 
                     except Exception as e:
                         st.error(e)
-
 
 # ============================================================
 # 🧬 MODEL EVALUATION
 # ============================================================
 
 with tab_model_evo:
-    st.subheader("🧬 LLM Evaluation")
+    st.subheader("🧬 LLM evaluation")
 
     if df is None or df.empty:
         st.info(
@@ -2867,7 +2887,7 @@ with tab_model_evo:
             # ------------------------------------------------
             # RUN EVALUATION
             # ------------------------------------------------
-            if st.button("🚀 Run Evaluation"):
+            if st.button("🚀 Run evaluation"):
 
                 try:
 
@@ -2883,7 +2903,7 @@ with tab_model_evo:
                     # ========================================
                     # METRICS
                     # ========================================
-                    st.markdown("### 📊 Evaluation Metrics")
+                    st.markdown("### 📊 Evaluation metrics")
 
                     c1, c2, c3, c4 = st.columns(4)
 
@@ -2898,7 +2918,7 @@ with tab_model_evo:
                     )
 
                     c3.metric(
-                        "F1 Score",
+                        "F1 score",
                         results["f1_score"]
                     )
 
@@ -2910,7 +2930,7 @@ with tab_model_evo:
                     # ========================================
                     # CONFUSION MATRIX
                     # ========================================
-                    st.markdown("### 🔀 Confusion Matrix")
+                    st.markdown("### 🔀 Confusion matrix")
 
                     cm = results["confusion_matrix"]
 
@@ -2929,14 +2949,14 @@ with tab_model_evo:
                     fig = px.imshow(
                         cm,
                         text_auto=True,
-                        title="Confusion Matrix Heatmap"
+                        title="Confusion matrix heatmap"
                     )
 
                     st.plotly_chart(fig, width='stretch')
                     # ========================================
                     # CLASSIFICATION REPORT
                     # ========================================
-                    st.markdown("### 📑 Classification Report")
+                    st.markdown("### 📑 Classification report")
 
                     st.code(
                         results["classification_report"],
@@ -2946,7 +2966,7 @@ with tab_model_evo:
                     # ========================================
                     # TOP FEATURES
                     # ========================================
-                    st.markdown("### 🧠 Top Predictive Features")
+                    st.markdown("### 🧠 Top predictive features")
 
                     feature_df = pd.DataFrame(
                         results["top_features"]
@@ -2980,7 +3000,7 @@ with tab_model_evo:
 # Benchmark
 # ============================================================
 with tab_benchmark:
-    st.header("📑 LLM Benchmark Report")
+    st.header("📑 LLM benchmark report")
 
     if df is None or df.empty:
         st.info("No experiment data found. Run a generation first or upload data set.")
@@ -3012,7 +3032,7 @@ with tab_benchmark:
         col4.metric("Unique Teachers", df_valid["teacher"].nunique())
 
         # --- 3. SUCCESS RATE (Uses full clean df to include failures) ---
-        st.subheader("✅ Validation Success Rate")
+        st.subheader("✅ Validation success rate")
         success_df = (
             df_clean.groupby("student")["v_ok_numeric"]
             .mean()
@@ -3021,16 +3041,16 @@ with tab_benchmark:
         )
         fig_success = px.bar(
             success_df, x="student", y="v_ok_numeric",
-            title="Pass Rate (%) by Model (v_ok_numeric)",
+            title="Pass rate (%) by model (v_ok_numeric)",
             labels={'v_ok_numeric': 'Success Probability', 'student': 'Model Name'},
-            template="plotly_dark",
+            template="plotly_white",
             color="v_ok_numeric",
             color_continuous_scale="RdYlGn"
         )
         st.plotly_chart(fig_success, width='stretch')
 
         # --- 4. PERFORMANCE (Inference Speed) ---
-        st.subheader("⚡ Performance Metrics")
+        st.subheader("⚡ Performance metrics")
         perf_df = (
             df_valid.groupby("student")[["ms_per_word", "duration_ms"]]
             .mean()
@@ -3040,12 +3060,12 @@ with tab_benchmark:
             perf_df, x="student", y="ms_per_word",
             title="Inference Speed (Lower is Better)",
             labels={'ms_per_word': 'Latency (ms/word)'},
-            template="plotly_dark"
+            template="plotly_white"
         )
         st.plotly_chart(fig_perf, width='stretch')
 
         # --- 5. QUALITY HEATMAP ---
-        st.subheader("💎 Quality Metrics Heatmap")
+        st.subheader("💎 Quality metrics heatmap")
         quality_cols = [
             "coherence", "cognitive_load", "lexical_density",
             "semantic_overlap", "expansion_ratio"
@@ -3057,9 +3077,9 @@ with tab_benchmark:
             fig_quality = px.imshow(
                 quality_df.set_index("student"),
                 text_auto=".3f",
-                title="Avg Quality Scores per Model",
+                title="Avg Quality Scores per model",
                 color_continuous_scale="Viridis",
-                template="plotly_dark"
+                template="plotly_white"
             )
             st.plotly_chart(fig_quality, width='stretch')
 
@@ -3076,7 +3096,7 @@ with tab_benchmark:
                 psycho_df, x="student", y=existing_psy,
                 barmode="group",
                 title="Linguistic Trait Distribution",
-                template="plotly_dark"
+                template="plotly_white"
             )
             st.plotly_chart(fig_psy, width='stretch')
 
@@ -3099,11 +3119,11 @@ with tab_benchmark:
         # Calculate 'Persona Precision' (Higher is better)
         leaderboard["mimicry_score"] = leaderboard["semantic_overlap"] * 100
 
-        # Normalized Speed Score (Inverse of ms_per_word)
+        # Normalized Speed score (Inverse of ms_per_word)
         max_ms = leaderboard["ms_per_word"].max()
         leaderboard["speed_score"] = (max_ms - leaderboard["ms_per_word"]) / max_ms
 
-        # Calculated Weighted Final Score
+        # Calculated weighted final score
         # Logic: 30% Success, 30% Mimicry, 20% Logic, 20% Speed
         leaderboard["final_score"] = (
                 leaderboard["v_ok_numeric"] * 0.3 +
@@ -3140,9 +3160,9 @@ with tab_monitor:
     st.subheader("🖥️ Ollama Management")
 
     # ============================================================
-    # Pull Model
+    # Pull model
     # ============================================================
-    st.markdown("##### Pull Model")
+    st.markdown("##### Pull model")
     with st.expander("📦 Model list", expanded=False):
 
         model_df = pd.DataFrame([
@@ -3151,7 +3171,6 @@ with tab_monitor:
             {"Model": "llama3.2:3b", "Size (GB)": 2.0},
             {"Model": "qwen2.5:3b", "Size (GB)": 2.1},
             {"Model": "tinyllama:latest", "Size (GB)": 0.7},
-            {"Model": "all-MiniLM", "Size (GB)": 0.05},
             {"Model": "stablelm2:1.6b", "Size (GB)": 1.0},
             {"Model": "deepseek-r1:1.5b", "Size (GB)": 1.1},
             {"Model": "mistral:7b-instruct-q4_K_M", "Size (GB)": 4.1},
@@ -3173,7 +3192,7 @@ with tab_monitor:
 
     with pull_col1:
         model_to_pull = st.text_input(
-            label="Pull Model",
+            label="Pull model",
             placeholder="e.g. llama3:latest",
             label_visibility="collapsed",
             key="model_to_pull"
@@ -3243,7 +3262,7 @@ with tab_monitor:
 
         with col_stop1:
 
-            if st.button("🛑 Cancel Pull"):
+            if st.button("🛑 Cancel pull"):
 
                 try:
 
@@ -3345,7 +3364,7 @@ with tab_monitor:
 # ============================================================
 if SHOW_DEBUG_TAB:
     with tab_debug:
-        st.write("### Session State Explorer")
+        st.write("### Session state explorer")
         st.json(st.session_state.to_dict())
 
     if st.session_state.history:
@@ -3366,15 +3385,15 @@ if SHOW_DEBUG_TAB:
     with st.expander("Schema check"):
         # width='stretch' is the modern replacement for width='stretch'
         st.dataframe(df_display, width='stretch')
-        st.subheader("Current Data Schema")
+        st.subheader("Current data schema")
         st.write(df.dtypes)
 
 # ============================================================
 # FAQ
 # ============================================================
 with tab_faq:
-    st.subheader("📚 User Guide & Metric Methodology")
-    faq_lang = st.segmented_control("Select Language", options=["English", "Українська"], default="English")
+    st.subheader("📚 User guide & Metric methodology")
+    faq_lang = st.segmented_control("Select language", options=["English", "Українська"], default="English")
 
     # 1. Get the absolute path to the directory containing streamlit_app.py
     current_dir = os.path.dirname(os.path.abspath(__file__))

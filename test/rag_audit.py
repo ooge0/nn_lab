@@ -9,7 +9,7 @@ Run:
 
 from collections import Counter
 
-from ai_projects_store.scr.NLP.psycho_data_augmentor.core.rag.ingestion import RAGEngine
+from core.rag.ingestion import RAGEngine
 
 
 def analyze_chunks(rag: RAGEngine):
@@ -88,7 +88,7 @@ def test_retrieval(rag: RAGEngine):
 
 if __name__ == "__main__":
     rag = RAGEngine()
-    rag.load_knowledge_base("./knowledge")
+    rag.load_knowledge_base("./knowledge/rag")
 
     analyze_chunks(rag)
     test_retrieval(rag)
