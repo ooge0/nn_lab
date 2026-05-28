@@ -29,7 +29,7 @@ def create_final_dashboard(df):
         df, dimensions=['teacher', 'student', 'archetype', 'v_ok_numeric'],
         color="archetype_id",
         color_continuous_scale=px.colors.qualitative.Plotly,
-        title="Logic Pipeline | Потік логіки (Колір: Психотип)"
+        title="Logic pipeline | Потік логіки (Колір: Психотип)"
     )
     fig0.update_layout(coloraxis_showscale=False)
 
@@ -37,14 +37,14 @@ def create_final_dashboard(df):
     fig1 = px.parallel_categories(
         df, dimensions=['teacher', 'student', 'archetype', 'v_ok_numeric'],
         color="v_ok_numeric", color_continuous_scale="RdYlGn",
-        title="Logic Pipeline | Потік логіки (Колір: v_ok)"
+        title="Logic pipeline | Потік логіки (Колір: v_ok)"
     )
 
     # FIG 2: Ефективність пар
     fig2 = px.bar(
         df, x="student", y="ms_per_word", color="v_ok_numeric",
         facet_col="teacher", barmode="group",
-        title="Productivity by Pair | Ефективність моделей"
+        title="Productivity teacher | Ефективність моделей"
     )
 
     # FIG 3: 3D Взаємодія
@@ -57,14 +57,14 @@ def create_final_dashboard(df):
     # FIG 4: Матриця вчителя
     fig4 = px.scatter_matrix(
         df, dimensions=['lexical_density', 'ms_per_word', 'cognitive_load'],
-        color="teacher", title="Teacher Impact Matrix | Матриця впливу вчителя"
+        color="teacher", title="Teacher impact matrix | Матриця впливу вчителя"
     )
 
     # FIG 5: Матриця вчитель + студент
     fig5 = px.scatter_matrix(
         df, dimensions=['lexical_density', 'ms_per_word', 'cognitive_load'],
         color="teacher", symbol="student",
-        title="Cross-Model Dependency | Матриця залежностей: Вчитель та Студент"
+        title="Cross-model dependency  | Матриця залежностей: Вчитель та Студент"
     )
     fig5.update_traces(diagonal_visible=False, marker=dict(size=4))
 

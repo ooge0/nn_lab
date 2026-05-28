@@ -1201,7 +1201,7 @@ with tab_analytics:
                 )
             with col_p2:
                 st.plotly_chart(
-                    px.line(df, y="ms_per_word", color="student", title="Generation Velocity (ms/word)",
+                    px.line(df, y="ms_per_word", color="student", title="Generation velocity (ms/word)",
                             template="plotly_white"),
                     width='stretch'
                 )
@@ -1211,19 +1211,19 @@ with tab_analytics:
             col_v1, col_v2 = st.columns(2)
             with col_v1:
                 st.plotly_chart(
-                    px.line(df, y="word_count", color="student", markers=True, title="Word Count Consistency",
+                    px.line(df, y="word_count", color="student", markers=True, title="Word count consistency",
                             template="plotly_white"),
                     width='stretch'
                 )
             with col_v2:
                 st.plotly_chart(
-                    px.bar(df, x="student", y="unique_ratio", color="student", title="Vocabulary Diversity Ratio",
+                    px.bar(df, x="student", y="unique_ratio", color="student", title="Vocabulary diversity ratio",
                            template="plotly_white"),
                     width='stretch'
                 )
 
             st.divider()
-            st.subheader("⚖️ Linguistic Distance")
+            st.subheader("⚖️ Linguistic distance")
             col_l1, col_l2 = st.columns(2)
             # Decide which column to use for coloring
             if "sweet_param" in df.columns:
@@ -1251,14 +1251,14 @@ with tab_analytics:
                         y="levenshtein_dist",
                         color=color_col,
                         barmode="group",
-                        title="Levenshtein Distance to Teacher",
+                        title="Levenshtein distance to teacher",
                         template="plotly_white"
                     ),
                     width='stretch'
                 )
             with col_l2:
                 st.plotly_chart(
-                    px.line(df, y="semantic_overlap", color="student", title="Semantic Alignment Overlap",
+                    px.line(df, y="semantic_overlap", color="student", title="Semantic alignment overlap",
                             template="plotly_white"),
                     width='stretch'
                 )
@@ -1329,7 +1329,7 @@ with tab_analytics:
 #  NLP features
 # ============================================================
 with tab_nlp:
-    st.subheader("🧪 Deep NLP Investigation (NLTK)")
+    st.subheader("🧪 Deep NLP investigation (NLTK)")
     if st.session_state.history:
         with st.spinner("Processing scientific metrics..."):
             # Use the Bridge to build the optimized DataFrame
@@ -1363,7 +1363,7 @@ with tab_nlp:
                 st.plotly_chart(px.scatter(
                     full_df, x="readability_ari", y="corrected_ttr",
                     color="archetype", symbol="student", size="word_count",
-                    title="Intelligence & Vocabulary Breadth"
+                    title="Intelligence & Vocabulary breadth"
                 ), width='stretch')
 
             with col_b:
@@ -1440,7 +1440,7 @@ with tab_nlp:
 
             with col_e_e:
                 st.write(
-                    "**Self-Focus vs Cognitive rigidity  (Bias Dependency)**")
+                    "**Self-Focus vs Cognitive rigidity  (Bias dependency)**")
                 st.plotly_chart(px.scatter(
                     full_df,
                     x="neuro_self_focus",
@@ -1536,7 +1536,7 @@ with tab_clusters:
             with c2:
                 # Allow user to toggle colors between Ground Truth and K-Means clusters
                 color_target = st.radio(
-                    "Color Points By:", ["archetype", "cluster_id", "student", "v_ok"],
+                    "Color points by:", ["archetype", "cluster_id", "student", "v_ok"],
                     horizontal=True,
                     help="Switch between actual archetypes or machine-discovered clusters."
                 )
@@ -1577,7 +1577,7 @@ with tab_clusters:
                 st.plotly_chart(fig, width='stretch')
 
                 # 3. Visual driver analysis
-                st.write("### 🚀 Axis Drivers Interpretation")
+                st.write("### 🚀 Axis drivers interpretation")
                 pc1_drivers, pc2_drivers = discovery.get_component_dependencies()
 
 
@@ -1586,10 +1586,10 @@ with tab_clusters:
                     fig_dr = px.bar(
                         top_drivers,
                         orientation='h',
-                        labels={'value': 'Impact Strength', 'index': 'NLP Metric'},
+                        labels={'value': 'Impact strength', 'index': 'NLP metric'},
                         color=top_drivers.values,
                         color_continuous_scale='RdBu',
-                        title=f"Top Drivers for {axis_name}"
+                        title=f"Top drivers for {axis_name}"
                     )
                     fig_dr.update_layout(showlegend=False, height=350, margin=dict(l=20, r=20, t=40, b=20))
                     return fig_dr
@@ -1616,7 +1616,7 @@ with tab_clusters:
                     )
 
             except Exception as e:
-                st.error(f"K-Means Error: {e}")
+                st.error(f"K-Means error: {e}")
                 st.info("Check if your history contains enough numeric metrics (Sentiment, rigidity, etc.)")
 
             st.divider()
@@ -1665,7 +1665,7 @@ with tab_clusters:
                         df_hdb, x='x', y='y',
                         color='Cluster name',
                         symbol='student',
-                        title="HDBSCAN: Density-Based Groups",
+                        title="HDBSCAN: Density-based groups",
                         hover_data=['archetype', 'bias'],
                         color_discrete_map={'Noise': '#7f8c8d'},
                         template="plotly_white"
@@ -1729,7 +1729,7 @@ with tab_clusters:
                     st.pyplot(fig_mst)
 
                 # --- 3. Anomaly analysis with contrast mode ---
-                st.write("### 🚩 anomaly analysis: High-distance outliers")
+                st.write("### 🚩 Anomaly analysis: High-distance outliers")
 
                 # Filter Noise points
                 outlier_df = df_hdb[df_hdb['cluster_id'] == -1].copy()
@@ -2313,7 +2313,7 @@ with tab_clusters:
 
                     with st.expander("📍 Projection space (Visualization)", expanded=False):
                         bt_vis_neighbors = st.slider(
-                            "Visualization Neighbors",
+                            "Visualization neighbors",
                             2,
                             100,
                             15,
@@ -2331,7 +2331,7 @@ with tab_clusters:
 
                     with st.expander("🌐 Density space (Clustering)", expanded=False):
                         bt_cluster_neighbors = st.slider(
-                            "Clustering Neighbors",
+                            "Clustering neighbors",
                             2,
                             100,
                             20,
@@ -2468,7 +2468,7 @@ with tab_clusters:
 
                     with st.expander("📊 Projection controls", expanded=False):
                         projection_color = st.selectbox(
-                            "Color By",
+                            "Color by",
                             [
                                 "cluster_name",
                                 "archetype",
@@ -2480,7 +2480,7 @@ with tab_clusters:
                         )
 
                         show_noise = st.toggle(
-                            "Show Noise",
+                            "Show noise",
                             value=True,
                             key="bt_show_noise"
                         )
@@ -2505,7 +2505,7 @@ with tab_clusters:
                             "coherence"
                         ],
                         template="plotly_white",
-                        title="UMAP Projection space"
+                        title="UMAP projection space"
                     )
 
                     fig_projection.update_traces(
@@ -2533,7 +2533,7 @@ with tab_clusters:
 
                     topology_subtab_sm, topology_subtab_mst, topology_subtab_condensed = st.tabs([
                         "Scatter map", "Minimum spanning tree",
-                        "Condensed Tree"
+                        "Condensed tree"
                     ])
 
                     with topology_subtab_sm:
@@ -3051,7 +3051,7 @@ with tab_benchmark:
         )
         st.plotly_chart(fig_success, width='stretch')
 
-        # --- 4. PERFORMANCE (Inference Speed) ---
+        # --- 4. PERFORMANCE (Inference speed) ---
         st.subheader("⚡ Performance metrics")
         perf_df = (
             df_valid.groupby("student")[["ms_per_word", "duration_ms"]]
@@ -3060,7 +3060,7 @@ with tab_benchmark:
         )
         fig_perf = px.bar(
             perf_df, x="student", y="ms_per_word",
-            title="Inference Speed (Lower is better)",
+            title="Inference speed (Lower is better)",
             labels={'ms_per_word': 'Latency (ms/word)'},
             template="plotly_white"
         )

@@ -1492,7 +1492,7 @@ with tab_analytics:
                 )
             with col_l2:
                 st.plotly_chart(
-                    px.line(df, y="semantic_overlap", color="student", title="Semantic Alignment Overlap",
+                    px.line(df, y="semantic_overlap", color="student", title="Semantic alignment Overlap",
                             template="plotly_dark"),
                     width='stretch'
                 )
@@ -1501,7 +1501,7 @@ with tab_analytics:
             st.subheader("🎭 Psycholinguistic Signature")
             st.plotly_chart(
                 px.scatter(df, x="punc_density", y="expansion_ratio", color="archetype", symbol="student",
-                           size="word_count", title="Style Distribution (Raw Space)", template="plotly_dark"),
+                           size="word_count", title="Style distribution (Raw Space)", template="plotly_dark"),
                 width='stretch'
             )
 
@@ -1515,7 +1515,7 @@ with tab_analytics:
                 with st.spinner("Calculating Pipeline..."):
                     figs = get_high_dim_dashboard(df)
 
-                st.write("#### 🔀 Logic Pipeline")
+                st.write("#### 🔀 Logic pipeline")
                 st.plotly_chart(figs[0], width='stretch', key="plot_logic_psy")
                 st.plotly_chart(figs[1], width='stretch', key="plot_logic_success")
 
@@ -2632,7 +2632,7 @@ with tab_benchmark:
         )
         st.plotly_chart(fig_success, width='stretch')
 
-        # --- 4. PERFORMANCE (Inference Speed) ---
+        # --- 4. PERFORMANCE (Inference speed) ---
         st.subheader("⚡ Performance Metrics")
         perf_df = (
             df_valid.groupby("student")[["ms_per_word", "duration_ms"]]
@@ -2641,7 +2641,7 @@ with tab_benchmark:
         )
         fig_perf = px.bar(
             perf_df, x="student", y="ms_per_word",
-            title="Inference Speed (Lower is Better)",
+            title="Inference speed (Lower is Better)",
             labels={'ms_per_word': 'Latency (ms/word)'},
             template="plotly_dark"
         )

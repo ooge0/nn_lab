@@ -367,7 +367,7 @@ $$
   Pass\ Rate = \frac{Valid\ Samples}{Total\ Samples} \cdot 100\%
   $$
 
-- **Performance Metrics (Inference Speed)**  
+- **Performance Metrics (Inference speed)**  
   Вимірює швидкість генерації:  
   $$
   Velocity = \frac{Time\ (ms)}{Word\ Count}
