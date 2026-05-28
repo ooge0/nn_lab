@@ -3026,10 +3026,10 @@ with tab_benchmark:
         # --- 2. DATASET OVERVIEW ---
         st.subheader("📊 Dataset overview")
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Total Samples", len(df))
-        col2.metric("Valid Samples", len(df_valid))
-        col3.metric("Unique Students", df_valid["student"].nunique())
-        col4.metric("Unique Teachers", df_valid["teacher"].nunique())
+        col1.metric("Total samples", len(df))
+        col2.metric("Valid samples", len(df_valid))
+        col3.metric("Unique students", df_valid["student"].nunique())
+        col4.metric("Unique teachers", df_valid["teacher"].nunique())
 
         # --- 3. SUCCESS RATE (Uses full clean df to include failures) ---
         st.subheader("✅ Validation success rate")
@@ -3042,7 +3042,7 @@ with tab_benchmark:
         fig_success = px.bar(
             success_df, x="student", y="v_ok_numeric",
             title="Pass rate (%) by model (v_ok_numeric)",
-            labels={'v_ok_numeric': 'Success Probability', 'student': 'Model Name'},
+            labels={'v_ok_numeric': 'Success probability', 'student': 'Model Name'},
             template="plotly_white",
             color="v_ok_numeric",
             color_continuous_scale="RdYlGn"
@@ -3058,7 +3058,7 @@ with tab_benchmark:
         )
         fig_perf = px.bar(
             perf_df, x="student", y="ms_per_word",
-            title="Inference Speed (Lower is Better)",
+            title="Inference Speed (Lower is better)",
             labels={'ms_per_word': 'Latency (ms/word)'},
             template="plotly_white"
         )
@@ -3077,7 +3077,7 @@ with tab_benchmark:
             fig_quality = px.imshow(
                 quality_df.set_index("student"),
                 text_auto=".3f",
-                title="Avg Quality Scores per model",
+                title="Avg quality scores per model",
                 color_continuous_scale="Viridis",
                 template="plotly_white"
             )
@@ -3146,10 +3146,10 @@ with tab_benchmark:
     
             **Behavioral Insights:**
             - **Stability:** Top validation success rate ensures high instruction following.
-            - **Linguistic Depth:** Balanced cognitive load scores suggest nuanced persona emulation.
-            - **Inference Optimization:** Demonstrates a superior words-per-second ratio.
+            - **Linguistic depth:** Balanced cognitive load scores suggest nuanced persona emulation.
+            - **Inference optimization:** Demonstrates a superior words-per-second ratio.
     
-            **Strategic Interpretation:** 
+            **Strategic interpretation:** 
             This model is the most recommended for **{best_model}** persona replication within the current context-aware sweep.
             """)
 
