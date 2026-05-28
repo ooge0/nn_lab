@@ -94,7 +94,7 @@ sys_prompts_defined_file_path = "./knowledge/sys_prompts_defined.json"
 #  PAGE CONFIG
 # ============================================================
 st.set_page_config(page_title="LLM Data lab", layout="wide", page_icon="🧠")
-st.title("📊 LLM Data lab")
+st.title("📊 LLM data lab")
 
 st.markdown("""
     <style>
@@ -279,7 +279,7 @@ with st.sidebar.expander("📊 Modes and statuses", expanded=st.session_state["o
         st.session_state["exclude_from_prompt"] = False
         st.session_state.auto_expanded = False
         st.session_state.exp_expanded = False
-        st.toast("Applied Teacher-Student Debug Config")
+        st.toast("Applied Teacher-Student debug config")
         st.rerun()
 
 # ============================================================
@@ -1184,7 +1184,7 @@ with tab_analytics:
                 )
 
             st.plotly_chart(
-                px.pie(df, names='student', title="Workload Distribution", template="plotly_white"),
+                px.pie(df, names='student', title="Workload distribution", template="plotly_white"),
                 width='stretch'
             )
 
@@ -1265,7 +1265,7 @@ with tab_analytics:
             st.subheader("🎭 Psycholinguistic Signature")
             st.plotly_chart(
                 px.scatter(df, x="punc_density", y="expansion_ratio", color="archetype", symbol="student",
-                           size="word_count", title="Style Distribution (Raw space)", template="plotly_white"),
+                           size="word_count", title="Style distribution (Raw space)", template="plotly_white"),
                 width='stretch'
             )
 
@@ -1302,7 +1302,7 @@ with tab_analytics:
                 # Distribution per model
                 st.plotly_chart(
                     px.box(df, x="student", y="zipf_deviation", color="student",
-                           title="Zipf deviation Distribution (Normalized)",
+                           title="Zipf deviation distribution (Normalized)",
                            template="plotly_white"),
                     width='stretch'
                 )
@@ -1788,7 +1788,7 @@ with tab_clusters:
                         width='stretch'
                     )
 
-                    # 4. Distribution Chart
+                    # 4. Distribution chart
                     st.bar_chart(outlier_df['student'].value_counts())
 
                 else:
@@ -1807,7 +1807,7 @@ with tab_clusters:
             st.info("High-precision latent space analysis with automated noise filtering.")
 
             # --- 1. DATA PRE-FILTERING ---
-            with st.expander("🛠️ Data Pre-filtering & Cleaning", expanded=False):
+            with st.expander("🛠️ Data pre-filtering & Cleaning", expanded=False):
                 col_f1, col_f2 = st.columns(2)
                 with col_f1:
                     min_len = st.number_input("Min output length", 0, 500, 20,
@@ -1826,7 +1826,7 @@ with tab_clusters:
                 with col_h1:
                     st.markdown("**Density (HDBSCAN)**")
                     min_size = st.number_input("Min cluster size", 2, 50, 5, key="umap_v3_msize")
-                    min_samples = st.number_input("Min Samples", 1, 20, 1, key="umap_v3_msamp")
+                    min_samples = st.number_input("Min samples", 1, 20, 1, key="umap_v3_msamp")
                 with col_h2:
                     st.markdown("**Projection (UMAP)**")
                     n_neighbors = st.slider("Neighbors", 2, 50, 15, key="umap_v3_neigh")
@@ -1834,7 +1834,7 @@ with tab_clusters:
                 with col_h3:
                     st.markdown("**Visuals**")
                     mst_color_mode = st.selectbox(
-                        "Color Nodes By:",
+                        "Color nodes by:",
                         ["Default (Density)", "Student model", "Archetype"],
                         key="umap_v3_color"
                     )
@@ -1972,7 +1972,7 @@ with tab_clusters:
                         st.success("✅ No anomalies found.")
 
                 except Exception as e:
-                    st.error(f"Processing Error: {e}")
+                    st.error(f"Processing error: {e}")
             else:
                 st.warning("Insufficient data points after filtering.")
 
@@ -1986,7 +1986,7 @@ with tab_clusters:
             col_h1, col_h2, col_h3 = st.columns(3)
             with col_h1:
                 min_size = st.number_input("Min cluster size", 2, 50, 5, key="umap_hdb_min_size_old")
-                min_samples = st.number_input("Min Samples (Noise)", 1, 20, 1, key="umap_hdb_min_samples_old")
+                min_samples = st.number_input("Min samples (Noise)", 1, 20, 1, key="umap_hdb_min_samples_old")
             with col_h2:
                 st.write("**UMAP Projection**")
                 n_neighbors = st.slider("Neighbors (Local vs Global)", 2, 50, 15,
@@ -1997,7 +1997,7 @@ with tab_clusters:
                                      help="Packing density of points.")
             with col_h3:
                 mst_color_mode = st.selectbox(
-                    "Color MST Nodes by:",
+                    "Color MST nodes by:",
                     ["Default (Density)", "Student model", "Archetype"],
                     key="umap_mst_color_mode_old"
                 )
@@ -2117,7 +2117,7 @@ with tab_clusters:
                             st.bar_chart(outlier_df['student'].value_counts())
 
                         with col_anom2:
-                            st.write("**Detailed Anomaly Inspector:**")
+                            st.write("**Detailed anomaly inspector:**")
                             selected_id = st.selectbox(
                                 "Select outlier ID to contrast:",
                                 outlier_df.index,
@@ -2337,7 +2337,7 @@ with tab_clusters:
                         )
 
                         bt_cluster_components = st.slider(
-                            "Clustering Embedding Dimensions",
+                            "Clustering embedding dimensions",
                             2,
                             50,
                             15,
@@ -2353,7 +2353,7 @@ with tab_clusters:
                         )
 
                         bt_min_samples = st.slider(
-                            "Min Samples",
+                            "Min samples",
                             1,
                             50,
                             3,
@@ -2462,9 +2462,9 @@ with tab_clusters:
                 # ============================================================
                 with topology_tab_projection:
 
-                    st.write("### 📍 Latent Projection space")
+                    st.write("### 📍 Latent projection space")
 
-                    with st.expander("📊 Projection Controls", expanded=False):
+                    with st.expander("📊 Projection controls", expanded=False):
                         projection_color = st.selectbox(
                             "Color By",
                             [
@@ -2535,7 +2535,7 @@ with tab_clusters:
                     ])
 
                     with topology_subtab_sm:
-                        st.write("**Scatter map: Behavioral topology**")
+                        st.write("**Scatter map: behavioral topology**")
 
                         # Проверяем, что есть координаты для отображения
                         if "x" in df_clustered.columns and "y" in df_clustered.columns:
@@ -2812,7 +2812,7 @@ with tab_clusters:
                         )
 
                         fit_c4.metric(
-                            "Noise Ratio",
+                            "Noise ratio",
                             f"{noise_ratio:.1f}%",
                             delta="Good" if noise_ratio < 30 else "Weak",
                             help="Good if < 30%"
@@ -2871,13 +2871,13 @@ with tab_model_evo:
         else:
 
             target_column = st.selectbox(
-                "🎯 Select Target Column",
+                "🎯 Select target column",
                 possible_targets,
                 index=0
             )
 
             test_size = st.slider(
-                "📦 Test Size",
+                "📦 Test size",
                 min_value=0.1,
                 max_value=0.5,
                 value=0.2,
@@ -2985,7 +2985,7 @@ with tab_model_evo:
                             feature_df.head(10),
                             x="feature",
                             y="abs_weight",
-                            title="Feature Importance"
+                            title="Feature importance"
                         )
 
                         st.plotly_chart(
@@ -3006,7 +3006,7 @@ with tab_benchmark:
         st.info("No experiment data found. Run a generation first or upload data set.")
     else:
 
-        # --- 1. IMPROVED DATA CLEANUP (Logic Alignment) ---
+        # --- 1. IMPROVED DATA CLEANUP (Logic alignment) ---
         df_clean = df.copy()
 
         # Apply standard filters to match the Clustering Tab
@@ -3024,7 +3024,7 @@ with tab_benchmark:
         df_valid = df_valid.drop_duplicates(subset=["output", "student", "teacher"])
 
         # --- 2. DATASET OVERVIEW ---
-        st.subheader("📊 Dataset Overview")
+        st.subheader("📊 Dataset overview")
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Total Samples", len(df))
         col2.metric("Valid Samples", len(df_valid))
@@ -3095,13 +3095,13 @@ with tab_benchmark:
             fig_psy = px.bar(
                 psycho_df, x="student", y=existing_psy,
                 barmode="group",
-                title="Linguistic Trait Distribution",
+                title="Linguistic trait distribution",
                 template="plotly_white"
             )
             st.plotly_chart(fig_psy, width='stretch')
 
         # --- 7. WEIGHTED LEADERBOARD ---
-        st.subheader("🏆 Model Leaderboard")
+        st.subheader("🏆 Model leaderboard")
         lb_metrics = {
             "v_ok_numeric": "mean",
             "coherence": "mean",
@@ -3157,7 +3157,7 @@ with tab_benchmark:
 # Monitor
 # ============================================================
 with tab_monitor:
-    st.subheader("🖥️ Ollama Management")
+    st.subheader("🖥️ Ollama management")
 
     # ============================================================
     # Pull model
