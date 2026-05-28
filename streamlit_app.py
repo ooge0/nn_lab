@@ -1875,7 +1875,7 @@ with tab_clusters:
                         lambda x: "Noise" if x == -1 else f"Cluster {x}")
 
                     # --- 4. VISUALIZATION EXPANDER ---
-                    with st.expander("📊 Latent  contrast &  Path analysis (MST)", expanded=True):
+                    with st.expander("📊 Latent  contrast &  Path analysis (MST)", expanded=Fasle):
                         v_tab1, v_tab2 = st.tabs(["Scatter map", "Minimum spanning tree"])
                         with v_tab1:
                             color_col = "Cluster name" if mst_color_mode == "Default (Density)" else (
@@ -2249,7 +2249,7 @@ with tab_clusters:
 
                     st.write("### ⚙️ Analysis engine configuration")
 
-                    with st.expander("🧬 Feature space", expanded=True):
+                    with st.expander("🧬 Feature space", expanded=False):
                         selected_groups = st.multiselect(
                             "Feature groups",
                             list(FEATURE_GROUPS.keys()),
