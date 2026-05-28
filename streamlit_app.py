@@ -692,7 +692,8 @@ with tab_gen:
             )
 
             exp_summary = f"""
-    Total iterations for current setup: {total_tasks_preview}
+    Total iterations for current setup: {total_tasks_preview}"""
+            exp_summary_extra = f"""
     Mode: {'SC' if self_critic else 'T-S'}
     Teacher: {teacher_model}
     Students: {', '.join(student_models)}
@@ -712,7 +713,8 @@ with tab_gen:
     Exclude archetype from prompt: {'Enabled' if exclude_from_prompt else 'Disabled'}
     System prompt: {sys_prompt}
     """
-            st.text_area("Experiment setup", exp_summary.strip(), height=300)
+            # st.text_area("Experiment setup", exp_summary.strip(), height=300)
+            st.caption(exp_summary.strip())
 
         # --- RIGHT PANEL ---
         with c_out:
