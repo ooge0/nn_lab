@@ -257,7 +257,7 @@ with st.sidebar.expander("📊 Modes and statuses", expanded=st.session_state["o
     if col_db1.button("Mode: SC", width='stretch'):
         st.session_state["self_critic"] = True
         st.session_state["prompt_strategy"] = "Behavioral conditioning (Tuned)"
-        st.session_state["model_select"] = ["qwen:latest"]
+        st.session_state["model_select"] = ["qwen:latest", "tinyllama:latest"]
         st.session_state["selected_archetypes"] = ["Detached"]
         st.session_state["current_sweep"] = "None"
         st.session_state["split_biases"] = False
@@ -1176,7 +1176,7 @@ with tab_analytics:
                 pivot = df.pivot_table(
                     index='student',
                     columns='val',
-                    values='v_ok_numeric',
+                        values='v_ok_numeric',
                     aggfunc='mean',
                     fill_value=0
                 )

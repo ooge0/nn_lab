@@ -1,4 +1,5 @@
-This program is a specialized benchmarking suite designed for the quantitative assessment of how large language models (LLMs) adapt to psychological constraints under various hyperparameters. It allows researchers to systematically vary generation parameters and observe how this affects the cognitive, semantic, and stylistic characteristics of the text. Thus, the tool provides not only performance measurement but also an in-depth analysis of model behavior in the context of psycholinguistics.
+This program is a specialized benchmarking suite designed for the quantitative assessment of how large language models (LLMs) adapt to different constraints, behavioral profiles, and knowledge contexts under various hyperparameters. It allows users to systematically vary generation settings, prompting strategies, evaluation modes, and retrieval conditions while observing how these changes affect the cognitive, semantic, linguistic, and stylistic characteristics of generated text. The platform combines synthetic data generation, behavioral testing, model evaluation, clustering, and advanced metrics collection within a unified workflow. Thus, the tool provides not only performance measurement but also deeper insight into model behavior, response stability, behavioral drift, and psycholinguistic patterns across different experimental conditions.
+
 
 It combines:
 

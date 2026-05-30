@@ -37,12 +37,14 @@ POS_PROFILES = {
 AVG_SENTENCE = {"Neutral": 11, "Structured": 17, "Expressive": 9, "Detached": 21, "Defensive": 14}
 RIGIDITY = {"Neutral": 0.2, "Structured": 0.8, "Expressive": 0.35, "Detached": 0.65, "Defensive": 0.9}
 STRATEGIES = {
-    "Neutral": "Direct Adaptation",
-    "Structured": "Structural Analyst",
+    "Neutral": "Blind mode (Hide label)",
+    "Structured": "Blind mode (Hide label)",
     "Expressive": "Behavioral conditioning (Tuned)",
-    "Detached": "Abstract Conceptualizer",
-    "Defensive": "Systemic Evaluator"
+    "Detached": "Raw / No system prompt",
+    "Defensive": "Behavioral conditioning (Tuned)"
 }
+
+
 SELF_FOCUS = {"Neutral": 0.15, "Structured": 0.45, "Expressive": 0.85, "Detached": 0.55, "Defensive": 0.75}
 COGNITIVE_LOAD = {"Neutral": 2.0, "Structured": 3.5, "Expressive": 4.0, "Detached": 1.5, "Defensive": 3.0}
 bias_adjust = {"positive": -0.15, "neutral": 0.0, "negative": 0.1, "toxic": 0.25}
@@ -51,8 +53,10 @@ split_bias_mode = SimpleNamespace(random=random.choice([True, False]))
 setattr(split_bias_mode, "True", True)
 setattr(split_bias_mode, "False", False)
 
+
 def jitter(value, sigma=0.05):
     return round(random.gauss(value, sigma), 3)
+
 
 def compute_zipf_deviation(text, top_n=50):
     tokens = text.lower().split()
@@ -68,10 +72,15 @@ def compute_zipf_deviation(text, top_n=50):
     norm_score = rmse / max(observed) if max(observed) > 0 else 0.0
     return round(norm_score, 4)
 
+
 def generate_record(step, archetype, bias, student, teacher, sweep_mode="None"):
     v_ok = random.random() > 0.1
-    base_temp, base_top_p, base_freq, base_pres = 0.7, 0.9, 1.1, 0.2
-    val = base_temp if sweep_mode == "None" else round(0.1 + (step / NUM_RECORDS) * (1.5 - 0.1), 3)
+
+    # Updated: base_temp is now non-static, choosing a random float from 0.0 to 1.6
+    base_temp = round(random.uniform(0.0, 1.6), 2)
+    base_top_p, base_freq, base_pres = 0.9, 1.1, 0.2
+
+    val = base_temp if sweep_mode == "None" else round(0.1 + (step / NUM_RECORDS) * (1.5 - 0.1), 2)
     base = 7000 / MODEL_PERF[student]
     duration_ms = round(random.gauss(base, base * 0.1), 3)
 
@@ -161,12 +170,12 @@ def generate_record(step, archetype, bias, student, teacher, sweep_mode="None"):
 
 # --- Cluster generator for HDBSCAN visualizations ---
 def generate_cluster_dataset(
-    num_records=2000,
-    num_clusters=5,
-    cluster_spread=0.5,
-    noise_fraction=0.1,
-    feature_dim=6,
-    random_seed=42
+        num_records=2000,
+        num_clusters=5,
+        cluster_spread=0.5,
+        noise_fraction=0.1,
+        feature_dim=6,
+        random_seed=42
 ):
     np.random.seed(random_seed)
     data, labels = [], []
@@ -195,7 +204,7 @@ if __name__ == "__main__":
             archetype = random.choice(ARCHETYPES)
             bias = random.choice(BIASES)
             student = random.choice(MODELS)
-            if 'single_teacher':
+            if single_teacher:
                 teacher = MODELS[0]
             else:
                 teacher = random.choice(MODELS)
