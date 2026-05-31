@@ -631,33 +631,75 @@ with tab_gen:
 
             split_biases = st.checkbox("Split biases", key="split_biases")
 
+            # mask_disabled = (
+            #         prompt_strategy in ["Blind mode (Hide label)", "Raw / No system prompt"]
+            # )
+            # exclude_from_prompt = st.checkbox(
+            #     "Exclude archetype from prompt",
+            #     value=mask_disabled,
+            #     disabled=mask_disabled
+            # )
+            #
+            # default_prompt = ""
+            # if selected_archetypes:
+            #     for archetype in selected_archetypes:
+            #         if prompt_strategy == "Behavioral conditioning (Tuned)":
+            #             default_prompt += (
+            #                 f"{ARCHETYPES['common']['intro']} "
+            #                 f"{ARCHETYPES['common']['pre_phrase']}"
+            #                 f"{selected_archetypes} archetype(s) "
+            #                 f"(bias: {target_biases_raw}). "
+            #                 f"{ARCHETYPES['common']['post_phrase_main']}.\n "
+            #                 f"{ARCHETYPES['common']['post_phrase_rules']}."
+            #             )
+            #         elif prompt_strategy == "Blind mode (Hide label)":
+            #             default_prompt += (
+            #                 f"{ARCHETYPES['common']['intro']}\n"
+            #                 "Rewrite using personality traits.\n"
+            #                 f"{ARCHETYPES['common']['post_phrase_main']} "
+            #                 f"{ARCHETYPES['common']['post_phrase_rules']}\n\n"
+            #             )
             mask_disabled = (
                     prompt_strategy in ["Blind mode (Hide label)", "Raw / No system prompt"]
             )
             exclude_from_prompt = st.checkbox(
                 "Exclude archetype from prompt",
-                value=mask_disabled,
-                disabled=mask_disabled
+                value=False,  # default unchecked
+                disabled=mask_disabled,
+                key="exclude_from_prompt"
             )
 
             default_prompt = ""
             if selected_archetypes:
                 for archetype in selected_archetypes:
                     if prompt_strategy == "Behavioral conditioning (Tuned)":
-                        default_prompt += (
-                            f"{ARCHETYPES['common']['intro']} "
-                            f"{ARCHETYPES['common']['pre_phrase']}"
-                            f"{selected_archetypes} archetype(s) "
-                            f"(bias: {target_biases_raw}). "
-                            f"{ARCHETYPES['common']['post_phrase_main']}.\n "
-                            f"{ARCHETYPES['common']['post_phrase_rules']}."
-                        )
+                        if exclude_from_prompt:
+                            default_prompt += (
+                                f"{ARCHETYPES['common']['intro']} "
+                                f"(bias: {target_biases_raw}). "
+                                f"{ARCHETYPES['common']['post_phrase_main']}.\n "
+                                f"{ARCHETYPES['common']['post_phrase_rules']}."
+                            )
+                        else:
+                            default_prompt += (
+                                f"{ARCHETYPES['common']['intro']} "
+                                f"{ARCHETYPES['common']['pre_phrase']}"
+                                f"{archetype} archetype "
+                                f"(bias: {target_biases_raw}). "
+                                f"{ARCHETYPES['common']['post_phrase_main']}.\n "
+                                f"{ARCHETYPES['common']['post_phrase_rules']}."
+                            )
                     elif prompt_strategy == "Blind mode (Hide label)":
                         default_prompt += (
                             f"{ARCHETYPES['common']['intro']}\n"
                             "Rewrite using personality traits.\n"
                             f"{ARCHETYPES['common']['post_phrase_main']} "
                             f"{ARCHETYPES['common']['post_phrase_rules']}\n\n"
+                        )
+                    elif prompt_strategy == "Raw / No system prompt":
+                        default_prompt += (
+                            f"{ARCHETYPES[archetype]['sys_prompt_main']} "
+                            f"(bias: {target_biases_raw})"
                         )
 
             sys_prompt = st.text_area(
@@ -872,7 +914,6 @@ with tab_gen:
                                 # SYSTEM PROMPT (bias injected)
                                 # =================================
                                 if prompt_strategy == "Behavioral conditioning (Tuned)":
-                                    # f"{ARCHETYPES[current_type]['sys_prompt_main']} archetype "
                                     iter_sys_prompt = (
                                         f"{ARCHETYPES['common']['intro']} "
                                         f"{ARCHETYPES['common']['pre_phrase']}"
@@ -884,10 +925,10 @@ with tab_gen:
                                 elif prompt_strategy == "Blind mode (Hide label)":
                                     iter_sys_prompt = (
                                         f"{ARCHETYPES['common']['intro']} "
-                                        f"Rewrite using traits: "
-                                        f"{ARCHETYPES[current_type]['sys_prompt_main']} "
-                                        f"(bias: {b_item}). ",
+                                        "Rewrite using personality traits. "
+                                        f"(bias: {b_item}). "
                                         f"{ARCHETYPES['common']['post_phrase_main']} "
+                                        f"{ARCHETYPES['common']['post_phrase_rules']}"
                                     )
                                 elif prompt_strategy == "Raw / No system prompt":
                                     iter_sys_prompt = (
@@ -1176,7 +1217,7 @@ with tab_analytics:
                 pivot = df.pivot_table(
                     index='student',
                     columns='val',
-                        values='v_ok_numeric',
+                    values='v_ok_numeric',
                     aggfunc='mean',
                     fill_value=0
                 )
@@ -1877,7 +1918,7 @@ with tab_clusters:
                         lambda x: "Noise" if x == -1 else f"Cluster {x}")
 
                     # --- 4. VISUALIZATION EXPANDER ---
-                    with st.expander("📊 Latent  contrast &  Path analysis (MST)", expanded=Fasle):
+                    with st.expander("📊 Latent  contrast &  Path analysis (MST)", expanded=False):
                         v_tab1, v_tab2 = st.tabs(["Scatter map", "Minimum spanning tree"])
                         with v_tab1:
                             color_col = "Cluster name" if mst_color_mode == "Default (Density)" else (
@@ -2801,7 +2842,7 @@ with tab_clusters:
                             "Davies-Bouldin",
                             f"{db_score:.3f}",
                             delta="Good" if db_score < 1.0 else "Weak",
-                            delta_color = "inverse",
+                            delta_color="inverse",
                             help="Good if < 1.0"
                         )
 
@@ -2809,7 +2850,7 @@ with tab_clusters:
                             "Label alignment (ARI)",
                             f"{ari_score:.3f}",
                             delta="Good" if ari_score > 0.5 else "Weak",
-                            delta_color = "inverse",
+                            delta_color="inverse",
                             help="Good if > 0.5"
                         )
 
