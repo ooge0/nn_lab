@@ -553,7 +553,10 @@ with tab_gen:
                 v_min, v_max = m_range
 
         with r[2]:
-            steps = st.number_input("Steps", 1, 20, 3, disabled=is_none)
+            steps = st.number_input("Steps", 2, 20, 2, disabled=is_none)
+            # Ensure valid step count
+            # if current_sweep != "None":
+            #     steps = max(2, steps)  # force at least 2 steps for sweeps
 
         # --- ASC/DESC checkboxes in individual columns for one-line look ---
         sort_disabled = is_none or sweep_mode == "MIN-MAX"
@@ -630,35 +633,6 @@ with tab_gen:
             )
 
             split_biases = st.checkbox("Split biases", key="split_biases")
-
-            # mask_disabled = (
-            #         prompt_strategy in ["Blind mode (Hide label)", "Raw / No system prompt"]
-            # )
-            # exclude_from_prompt = st.checkbox(
-            #     "Exclude archetype from prompt",
-            #     value=mask_disabled,
-            #     disabled=mask_disabled
-            # )
-            #
-            # default_prompt = ""
-            # if selected_archetypes:
-            #     for archetype in selected_archetypes:
-            #         if prompt_strategy == "Behavioral conditioning (Tuned)":
-            #             default_prompt += (
-            #                 f"{ARCHETYPES['common']['intro']} "
-            #                 f"{ARCHETYPES['common']['pre_phrase']}"
-            #                 f"{selected_archetypes} archetype(s) "
-            #                 f"(bias: {target_biases_raw}). "
-            #                 f"{ARCHETYPES['common']['post_phrase_main']}.\n "
-            #                 f"{ARCHETYPES['common']['post_phrase_rules']}."
-            #             )
-            #         elif prompt_strategy == "Blind mode (Hide label)":
-            #             default_prompt += (
-            #                 f"{ARCHETYPES['common']['intro']}\n"
-            #                 "Rewrite using personality traits.\n"
-            #                 f"{ARCHETYPES['common']['post_phrase_main']} "
-            #                 f"{ARCHETYPES['common']['post_phrase_rules']}\n\n"
-            #             )
             mask_disabled = (
                     prompt_strategy in ["Blind mode (Hide label)", "Raw / No system prompt"]
             )
@@ -701,12 +675,9 @@ with tab_gen:
                             f"{ARCHETYPES[archetype]['sys_prompt_main']} "
                             f"(bias: {target_biases_raw})"
                         )
-
-            sys_prompt = st.text_area(
-                "System prompt",
-                value=default_prompt.strip(),
-                height=150
-            )
+            sys_prompt = default_prompt.strip()
+            with st.expander("System prompt", expanded=False):
+                    sys_prompt
 
             # --- VALIDATION ---
             missing_params = []
@@ -755,7 +726,6 @@ with tab_gen:
     Exclude archetype from prompt: {'Enabled' if exclude_from_prompt else 'Disabled'}
     System prompt: {sys_prompt}
     """
-            # st.text_area("Experiment setup", exp_summary.strip(), height=300)
             st.caption(exp_summary.strip())
 
         # --- RIGHT PANEL ---
@@ -1031,7 +1001,7 @@ with tab_gen:
                                     "sweet_param": current_sweep,
                                     "v_ok": v_ok,
                                     "v_ok_numeric": int(v_ok),
-                                    "val": v_val,
+                                    "val": None,
                                     "output": clean_text,
                                     "duration_ms": gen_dur,
                                     "validation_duration_ms": v_dur,
