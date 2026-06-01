@@ -92,7 +92,7 @@ class ModelEvaluation:
 
         if len(X) < 10:
             raise ValueError(
-                "Dataset too small for evaluation."
+                f"Dataset too small for evaluation. Total number of rows ({len(X)}) is less than 10."
             )
 
         # ---------------------------------------------
