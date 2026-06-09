@@ -37,8 +37,19 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 ```
 
-### 2. Install Dependencies
+### 2. Generate and install dependencies
 
+Install pip-tools
+```bash
+pip install pip-tools
+```
+
+Generate dependencies
+```bash
+pip-compile requirements.in
+```
+
+Install dependencies
 ```bash
 pip install --upgrade pip  
 ```
