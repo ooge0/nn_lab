@@ -15,3 +15,4 @@
 /logs/
 /results/
 /__pycache__
+/config.ini

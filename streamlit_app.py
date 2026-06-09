@@ -32,6 +32,7 @@ from core.analysis.nlp_science import PsychScientist
 from core.analysis.neuro_metrics import NeuroMetrics
 from core.analysis.data_contract import LabDataBridge
 from core.analysis.cluster_discovery import ClusterDiscovery
+from core.tabs.knowledge_graph import knowledge_graph_tab
 import hdbscan
 import numpy as np
 from sklearn.preprocessing import StandardScaler
@@ -354,6 +355,7 @@ tab_labels = [
     "🧩 Embedding clusters",
     "🧬 LLM evaluation",
     "📑 Benchmark",
+    "📑 K_G",
     "🖥️ System monitor",
 ]
 
@@ -371,15 +373,16 @@ tab_nlp = tabs[3]
 tab_clusters = tabs[4]
 tab_model_evo = tabs[5]
 tab_benchmark = tabs[6]
-tab_monitor = tabs[7]
+tab_knowledge_graph = tabs[7]
+tab_monitor = tabs[8]
 
 tab_debug = None
 
 if SHOW_DEBUG_TAB:
-    tab_debug = tabs[8]
-    tab_faq = tabs[9]
+    tab_debug = tabs[9]
+    tab_faq = tabs[10]
 else:
-    tab_faq = tabs[8]
+    tab_faq = tabs[9]
 
 df = None
 df = pd.json_normalize(st.session_state.history) if st.session_state.history else pd.DataFrame()
@@ -3165,6 +3168,12 @@ with tab_benchmark:
             **Strategic interpretation:** 
             This model is the most recommended for **{best_model}** persona replication within the current context-aware sweep.
             """)
+# ============================================================
+# Knowledge graph
+# ============================================================
+with tab_knowledge_graph:
+    df = pd.json_normalize(st.session_state.history)
+    knowledge_graph_tab(df)
 
 # ============================================================
 # Monitor
