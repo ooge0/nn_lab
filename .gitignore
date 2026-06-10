@@ -16,3 +16,6 @@
 /results/
 /__pycache__
 /config.ini
+/tox.ini
+/.tox/
+/config/

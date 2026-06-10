@@ -19,7 +19,7 @@ def rag():
     engine = RAGEngine()
 
     base_dir = os.path.dirname(os.path.dirname(__file__))
-    knowledge_path = os.path.join(base_dir, "knowledge")
+    knowledge_path = os.path.join(base_dir, "knowledge/rag")
     print(f"knowledge_path : {knowledge_path}")
     engine.load_knowledge_base(knowledge_path)
 
