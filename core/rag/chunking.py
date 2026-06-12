@@ -1,3 +1,4 @@
+from loguru import logger
 """
 chunking.py
 
@@ -56,7 +57,8 @@ def parse_txt_file(file_path: str, archetype: str) -> List[Chunk]:
                         content=content_val
                     )
                 )
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Skipping malformed line in {file_path}: {line} ({e})")
                 continue
 
     return chunks
