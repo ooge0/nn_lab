@@ -17,7 +17,7 @@ class ClusterDiscovery:
 
     def process_data(self, df):
         # 1. Filter out non-numeric and coordinates immediately
-        # We also drop common ID/status fields to keep the clustering 'clean'
+        # Drop common ID/status fields to keep the clustering 'clean'
         ignore = ['x', 'y', 'v_ok_numeric', 'val']
         numeric_df = df.select_dtypes(include=['number']).drop(columns=ignore, errors='ignore').copy()
 

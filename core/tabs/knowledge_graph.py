@@ -189,7 +189,6 @@ def knowledge_graph_tab(df):
 
     with tab5:
         st.header("Hypothesis Testing: Archetype Comparison")
-
         # User selects archetypes and metric
         archetype_A = st.selectbox("Choose Archetype A", df['archetype'].unique())
         archetype_B = st.selectbox("Choose Archetype B", df['archetype'].unique())

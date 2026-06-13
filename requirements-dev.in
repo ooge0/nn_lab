@@ -1,0 +1,13 @@
+-r requirements.in
+
+# Dev tools
+mypy
+ruff
+black
+pytest
+pytest-cov
+pyvis
+
+# Type stubs (only those that exist!)
+types-PyYAML
+scikit-learn-stubs

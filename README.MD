@@ -128,7 +128,149 @@ tox
 ```
 *   **On Ubuntu:** Tox hooks `requirements-base.txt` + `requirements-linux.txt` then boots `pytest`.
 *   **On Windows 11:** Tox installs `requirements-base.txt`, runs the native Windows CUDA wheel installation directly from the PyTorch index, skips Linux binaries, then boots `pytest`.
+
 ---
+
+
+# TOX Commands Cheat Sheet
+
+Run commands from project root.
+
+## MAIN EXECUTION
+
+### Run all configured environments from env_list
+```bash
+tox
+```
+
+# Show available environments and descriptions
+```bash
+tox list
+```
+
+### Recreate environments before execution
+```bash
+tox -r
+```
+
+### Verbose execution
+```bash
+tox -vv
+```
+
+## TESTING
+
+### Run default test environment (pytest tests -v)
+```bash
+tox -e py311
+```
+
+### Run tests with coverage and generate HTML report
+```bash
+tox -e coverage
+```
+
+## CODE QUALITY
+
+### Run Ruff lint checks
+```bash
+tox -e lint
+```
+
+### Auto-format source code with Black
+```bash
+tox -e format
+```
+
+### Run static type checking
+```bash
+tox -e type
+```
+## APPLICATION VALIDATION
+
+### Run Streamlit application smoke test
+```bash
+tox -e streamlit
+```
+
+## LLM / AI LAB WORKFLOWS
+
+### Execute evaluation experiments
+```bash
+tox -e eval
+```
+
+### Run Retrieval-Augmented Generation tests
+```bash
+tox -e rag
+```
+
+### Run LLM-specific validation suite
+```bash
+tox -e llm
+```
+
+## ADVANCED USAGE
+
+### Execute multiple environments
+```bash
+tox -e lint,py311
+```
+
+### Run formatting + lint + typing
+```bash
+tox -e format,lint,type
+```
+
+### Full quality pipeline
+```bash
+tox -e format,lint,type,coverage
+```
+
+### Run all AI evaluation flows
+```bash
+tox -e eval,rag,llm
+```
+
+### Rebuild env and run tests
+```bash
+tox -r -e py311
+```
+
+### Keep existing env and skip recreation
+```bash
+tox --notest
+```
+
+### Run single test manually inside ```bash
+tox env
+```bash
+tox -e py311 -- tests/test_api.py
+```
+
+### Pass pytest arguments
+```bash
+tox -e py311 -- -k login
+```
+
+### Stop on first failed environment
+```bash
+tox --exit-and-dump-after seconds=1
+```
+
+## Environment Summary
+
+| Environment | Purpose                      |
+| ----------- | ---------------------------- |
+| py311       | Execute pytest suite         |
+| coverage    | Generate coverage reports    |
+| lint        | Ruff static analysis         |
+| format      | Black formatting             |
+| type        | Mypy type validation         |
+| streamlit   | Streamlit startup validation |
+| eval        | LLM evaluation experiments   |
+| rag         | RAG pipeline testing         |
+| llm         | LLM-specific test execution  |
 
 =============== PHASE II ===========================
 
@@ -201,6 +343,7 @@ D:\setup\neo4j\2026.05.0\
 3. Open PowerShell:
 
 ```powershell
+#e.g. see eacmple for win11 path
 cd D:\setup\neo4j\2026.05.0\bin
 neo4j console
 ```
