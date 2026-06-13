@@ -21,6 +21,7 @@ from umap import UMAP
 
 from core.analysis.model_evaluation import ModelEvaluation
 from core.rag.ingestion import RAGEngine
+from core.tabs.failure_taxonomy import Taxonomy_Failure_metrics
 from tmp.simple_plotty_staff import get_high_dim_dashboard
 from utils.app_utils import AppUtils
 
@@ -32,7 +33,7 @@ from core.analysis.nlp_science import PsychScientist
 from core.analysis.neuro_metrics import NeuroMetrics
 from core.analysis.data_contract import LabDataBridge
 from core.analysis.cluster_discovery import ClusterDiscovery
-from core.tabs.knowledge_graph import knowledge_graph_tab
+from core.tabs.knowledge_graph import knowledge_graph_tab, ensure_neo4j_run
 import hdbscan
 import numpy as np
 from sklearn.preprocessing import StandardScaler
@@ -122,7 +123,6 @@ def ensure_ollama_run():
     except Exception as e:
         logger.error(f"Ollama connection failed: {e}")
         return False
-
 
 client = OpenAI(
     base_url="http://localhost:11434/v1",
@@ -234,9 +234,9 @@ if st.sidebar.button("Toggle 'Debug' + 'Lab'"):
 # ============================================================
 st.sidebar.title("🧪 Debug preset")
 
-with st.sidebar.expander("📊 Modes and statuses", expanded=st.session_state["open_debug"]):
+with st.sidebar.expander("📊 Modes and statuses", expanded=st.session_state.get("open_debug", True)):
     # --- Row 1: Infrastructure Status ---
-    status_col1, status_col2 = st.columns(2)
+    status_col1, status_col2, status_col3 = st.columns(3)
 
     with status_col1:
         if ensure_ollama_run():
@@ -249,6 +249,16 @@ with st.sidebar.expander("📊 Modes and statuses", expanded=st.session_state["o
     with status_col2:
         if ensure_nltk_resources():
             st.success("NLP ✅")
+        else:
+            st.error("NLP ❌")
+
+    with status_col3:
+        if ensure_neo4j_run():
+            st.success("Neo4j ✅")
+        else:
+            st.error("Neo4j ❌")
+            st.caption("Run: `neo4j console`")
+
 
     # --- Row 2: Action Buttons ---
     st.write("")  # Spacer
@@ -284,7 +294,7 @@ with st.sidebar.expander("📊 Modes and statuses", expanded=st.session_state["o
         st.rerun()
 
 # ============================================================
-#
+# SIDEBAR. LAB CONTROLS
 # ============================================================
 st.sidebar.title("🧪 Lab controls")
 with st.sidebar.expander("📊 Baseline parameters", expanded=st.session_state["open_debug"]):
@@ -356,6 +366,7 @@ tab_labels = [
     "🧬 LLM evaluation",
     "📑 Benchmark",
     "📑 K_G",
+    "📑 tab_taxonomy_failure_metrics",
     "🖥️ System monitor",
 ]
 
@@ -374,13 +385,14 @@ tab_clusters = tabs[4]
 tab_model_evo = tabs[5]
 tab_benchmark = tabs[6]
 tab_knowledge_graph = tabs[7]
-tab_monitor = tabs[8]
+tab_taxonomy_failure_metrics = tabs[8]
+tab_monitor = tabs[9]
 
 tab_debug = None
 
 if SHOW_DEBUG_TAB:
-    tab_debug = tabs[9]
-    tab_faq = tabs[10]
+    tab_debug = tabs[10]
+    tab_faq = tabs[11]
 else:
     tab_faq = tabs[9]
 
@@ -680,7 +692,7 @@ with tab_gen:
                         )
             sys_prompt = default_prompt.strip()
             with st.expander("System prompt", expanded=False):
-                    sys_prompt
+                sys_prompt
 
             # --- VALIDATION ---
             missing_params = []
@@ -3175,6 +3187,14 @@ with tab_knowledge_graph:
     df = pd.json_normalize(st.session_state.history)
     knowledge_graph_tab(df)
 
+# ============================================================
+# TAXONOMY FAILURE METRICS
+# ============================================================
+
+with tab_taxonomy_failure_metrics:
+    df = pd.json_normalize(st.session_state.history)
+    taxonomy = Taxonomy_Failure_metrics(df)
+    taxonomy.render_tab()
 # ============================================================
 # Monitor
 # ============================================================

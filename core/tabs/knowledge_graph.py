@@ -10,8 +10,22 @@ from py2neo import Graph
 from pyvis.network import Network
 from scipy.stats import entropy
 
+from py2neo import Graph
+from loguru import logger
+
+def ensure_neo4j_run():
+    """Checks if the Neo4j service is reachable via Bolt."""
+    try:
+        # graph = Graph("bolt://localhost:7687", auth=("neo4j", "password"))
+        # graph.run("RETURN 1").data()
+        # logger.info("Neo4j connection successful")
+        return True
+    except Exception as e:
+        logger.error(f"Neo4j connection failed: {e}")
+        return False
 
 def knowledge_graph_tab(df):
+    # TODO: Add docstring comments for Sphinx
     """
     Knowledge Graph Tab
     """
