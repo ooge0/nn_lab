@@ -275,7 +275,7 @@ with st.sidebar.expander("📊 Neutral parameters", expanded=st.session_state["o
 col1, col2 = st.sidebar.columns(2)
 
 with col1:
-    if st.button("💾 Save JSONL", use_container_width=True):
+    if st.button("💾 Save JSONL", width='stretch'):
         if st.session_state.history:
             fname = f"{RESULTS_DIR}/lab_export_{time.strftime('%Y%m%d_%H%M%S')}.jsonl"
             with open(fname, 'w', encoding='utf-8') as f:
@@ -286,7 +286,7 @@ with col1:
             st.sidebar.warning("No data")
 
 with col2:
-    if st.button("🗑️ Clear history", use_container_width=True):
+    if st.button("🗑️ Clear history", width='stretch'):
         st.session_state.history = []
         st.session_state.log_entries = []
         st.session_state.last_run_summary = ""

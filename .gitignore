@@ -9,6 +9,11 @@
 # idea folder, uncomment if you don't need it
 .idea
 
+
+# Sphinx build output
+docs/build/
+docs/source/_build/
+
 #other dirs
 
 /.pytest_cache

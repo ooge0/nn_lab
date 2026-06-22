@@ -21,7 +21,9 @@ from umap import UMAP
 
 from core.analysis.model_evaluation import ModelEvaluation
 from core.rag.ingestion import RAGEngine
+from core.service.neo4j_service import Neo4jService
 from core.tabs.failure_taxonomy import Taxonomy_Failure_metrics
+from core.tabs.knowledge_graph import KnowledgeGraph
 from tmp.simple_plotty_staff import get_high_dim_dashboard
 from utils.app_utils import AppUtils
 
@@ -33,7 +35,6 @@ from core.analysis.nlp_science import PsychScientist
 from core.analysis.neuro_metrics import NeuroMetrics
 from core.analysis.data_contract import LabDataBridge
 from core.analysis.cluster_discovery import ClusterDiscovery
-from core.tabs.knowledge_graph import knowledge_graph_tab, ensure_neo4j_run
 import hdbscan
 import numpy as np
 from sklearn.preprocessing import StandardScaler
@@ -252,8 +253,10 @@ with st.sidebar.expander("📊 Modes and statuses", expanded=st.session_state.ge
         else:
             st.error("NLP ❌")
 
+    neo4j_service = Neo4jService()
     with status_col3:
-        if ensure_neo4j_run():
+        #TODO: Add description
+        if neo4j_service.ensure_neo4j_run():
             st.success("Neo4j ✅")
         else:
             st.error("Neo4j ❌")
@@ -761,7 +764,7 @@ with tab_gen:
         if st.button(
                 "Run generation",
                 disabled=(not is_ready_to_run or st.session_state.is_running),
-                use_container_width=True
+                width='stretch'
         ):
             st.session_state.is_running = True
             st.session_state.stop_requested = False
@@ -773,7 +776,7 @@ with tab_gen:
                 "Stop generation",
                 disabled=(not st.session_state.is_running),
                 on_click=trigger_stop,
-                use_container_width=True
+                width='stretch'
         ):
             st.rerun()
 
@@ -3185,7 +3188,9 @@ with tab_benchmark:
 # ============================================================
 with tab_knowledge_graph:
     df = pd.json_normalize(st.session_state.history)
-    knowledge_graph_tab(df)
+    # k_g = KnowledgeGraph()
+    # k_g.knowledge_graph_tab(df)
+    KnowledgeGraph.knowledge_graph_tab(df)
 
 # ============================================================
 # TAXONOMY FAILURE METRICS

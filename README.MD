@@ -387,6 +387,10 @@ Download and extract Neo4j Community Edition:
 tar -xzf neo4j-community-*.tar.gz
 cd neo4j-community-*/bin
 ```
+Move to Neo4j source folder
+```bash
+cd ./usr/bin
+```
 
 Start Neo4j:
 
@@ -672,3 +676,70 @@ HDBSCAN density graph
         ↓
 Mutual reachability graph↓Minimum spanning tree
 ```
+
+
+
+========================== PHASE III =====================================
+## Sphinx Documentation
+
+This project uses [Sphinx](https://www.sphinx-doc.org/) to generate developer documentation from Python docstrings.
+
+### Setup
+
+Install Sphinx and common extensions:
+
+```bash
+pip install sphinx sphinx-autodoc-typehints sphinx-rtd-theme
+```
+Initialize Docs
+From the project root:
+
+```bash
+sphinx-quickstart docs
+```
+This will create a docs/ folder with conf.py and index.rst.
+
+Configure conf.py
+Edit docs/conf.py:
+
+```python
+import os
+import sys
+sys.path.insert(0, os.path.abspath("../core"))
+
+extensions = [
+    "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",   # Google/NumPy style docstrings
+    "sphinx_autodoc_typehints",
+]
+
+html_theme = "sphinx_rtd_theme"
+```
+
+Autodoc Integration
+In docs/index.rst, add:
+
+```rst
+.. toctree::
+   :maxdepth: 2
+   :caption: API Reference
+
+   modules
+```
+
+Generate module stubs:
+
+```bash
+sphinx-apidoc -o docs/source core
+```
+
+Build Docs
+```bash
+make html
+```
+
+Open docs/_build/html/index.html in your browser.
+
+Notes
+All classes and functions should have Sphinx-style docstrings.
+Use the napoleon extension for Google/NumPy docstring formats.

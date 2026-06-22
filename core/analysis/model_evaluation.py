@@ -20,15 +20,48 @@ from sklearn.metrics import (
 
 class ModelEvaluation:
     """
-    Evaluates how well linguistic / neuro metrics
-    predict a target label.
+    ModelEvaluation provides a baseline pipeline for evaluating how well
+    linguistic, semantic, and neuropsychological metrics predict a target label.
 
-    Example target:
-        - hallucination
-        - truthful_response
-        - anomaly
-        - archetype
+    Main Description
+    ----------------
+    This class wraps a scikit‑learn `LogisticRegression` model with preprocessing
+    steps (scaling, train/test split) and evaluation metrics. It is designed to
+    test whether features such as lexical density, sentiment, or neuro‑cognitive
+    load can predict categorical outcomes like hallucination, anomaly, or
+    archetype labels. The evaluation includes precision, recall, F1, ROC‑AUC,
+    confusion matrix, and feature importance.
+
+    References
+    ----------
+    - Logistic Regression: https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html
+    - Train/Test Split: https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html
+    - StandardScaler: https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html
+    - Precision/Recall/F1: https://scikit-learn.org/stable/modules/model_evaluation.html#classification-metrics
+    - ROC AUC: https://scikit-learn.org/stable/modules/generated/sklearn.metrics.roc_auc_score.html
+    - Confusion Matrix: https://scikit-learn.org/stable/modules/generated/sklearn.metrics.confusion_matrix.html
+
+    Required Params
+    ---------------
+    target_column : str, optional
+        Name of the target column in the DataFrame (default: "label").
+        This column must exist in the dataset for evaluation.
+
+    Other Staff
+    -----------
+    - Uses `StandardScaler` to normalize numeric features.
+    - Ignores non‑feature columns such as "x", "y", "cluster_id", "text".
+    - Raises `ValueError` if dataset is too small (< 10 rows) or target column
+      is missing.
+    - Provides `evaluate()` for full pipeline (train/test split, metrics, feature
+      importance).
+    - Provides `predict()` for inference on new unseen samples.
+    - Feature importance is derived from logistic regression coefficients and
+      sorted by absolute weight.
+    - Designed as a simple, interpretable baseline model for experimental
+      pipelines.
     """
+
 
     def __init__(self, target_column="label"):
         self.target_column = target_column
