@@ -11,12 +11,12 @@ class PlotlyAuditParser(ast.NodeVisitor):
 
         # Mapping Plotly methods to their specific coordinate parameters
         self.param_map = {
-            'scatter': ('x', 'y', None),
-            'line': ('x', 'y', None),
-            'bar': ('x', 'y', None),
-            'box': ('x', 'y', None),
-            'pie': ('names', 'values', None),
-            'scatter_ternary': ('a', 'b', 'c'),
+            "scatter": ("x", "y", None),
+            "line": ("x", "y", None),
+            "bar": ("x", "y", None),
+            "box": ("x", "y", None),
+            "pie": ("names", "values", None),
+            "scatter_ternary": ("a", "b", "c"),
         }
 
     def visit_With(self, node):
@@ -33,12 +33,12 @@ class PlotlyAuditParser(ast.NodeVisitor):
     def visit_Call(self, node):
         # Detect px. calls
         if isinstance(node.func, ast.Attribute):
-            if isinstance(node.func.value, ast.Name) and node.func.value.id == 'px':
+            if isinstance(node.func.value, ast.Name) and node.func.value.id == "px":
                 method_name = node.func.attr
                 keywords = {kw.arg: self._get_val(kw.value) for kw in node.keywords}
 
                 # Identify parameters based on chart type
-                mapping = self.param_map.get(method_name, ('x', 'y', None))
+                mapping = self.param_map.get(method_name, ("x", "y", None))
 
                 p1 = keywords.get(mapping[0], "")
                 p2 = keywords.get(mapping[1], "")
@@ -55,7 +55,7 @@ class PlotlyAuditParser(ast.NodeVisitor):
                     "Analytics": "",
                     "NLP Science": "",
                     "other": "calculate_advanced_linguistic_metrics , neuro_metrics, nlp_science",
-                    "context_tab": self.current_tab  # Extra column for your internal control
+                    "context_tab": self.current_tab,  # Extra column for your internal control
                 }
                 self.results.append(row)
                 self.order += 1

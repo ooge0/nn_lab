@@ -1,0 +1,36 @@
+{# Fragment swapped into a run row's status cell after a POST /db_export/export. Wrapped in its own
+   id'd div (not just "this") so the "Re-export" button below can replace the whole fragment --
+   including the original error message -- via outerHTML, not just itself. #}
+<div id="db-export-result-{{ run_id }}">
+  {% if error %}
+    <span class="status-badge status-fail" title="{{ error }}">❌ {{ error }}</span>
+    {% if "already has" in error %}
+    <button
+      type="button"
+      hx-post="/db_export/export?run_id={{ run_id }}&overwrite=true"
+      hx-target="#db-export-result-{{ run_id }}"
+      hx-swap="outerHTML"
+      hx-indicator="#db-export-reexport-spinner-{{ run_id }}"
+      hx-disabled-elt="this"
+    >
+      Re-export (overwrite)
+      <span id="db-export-reexport-spinner-{{ run_id }}" class="htmx-indicator spinner" aria-hidden="true"></span>
+    </button>
+    {% endif %}
+  {% else %}
+    <span class="status-badge status-ok">
+      ✅ {{ result.response_count }} response(s) {{ "re-" if result.overwritten else "" }}exported to {{ result.db_path }}
+    </span>
+  {% endif %}
+</div>
+{% if result %}
+{# Out-of-band update: the "Export status" column lives in a different table cell than the one
+   hx-target above swaps -- htmx applies any element in the response carrying hx-swap-oob to the
+   matching id anywhere on the page, regardless of the request's own hx-target, so the new sync
+   timestamp appears immediately without a page reload. Targets the inner <span>, not a bare <td>
+   -- see db_export.html's comment on the same id for why a <td> at the top level of an AJAX
+   response gets mangled by the browser's own table-parsing rules instead of cleanly replaced. #}
+<span id="db-export-sync-status-{{ run_id }}" class="sync-timestamp" hx-swap-oob="true">
+  {{ synced_at if synced_at else "Not synced" }}
+</span>
+{% endif %}

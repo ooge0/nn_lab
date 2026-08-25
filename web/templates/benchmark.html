@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>
+  (function(){
+    try {
+      var theme = localStorage.getItem("nn_lab_theme") === "light" ? "light" : "dark";
+      if (theme === "light") {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+      // Keeps the server-side cookie (read by web/plotting/render.py for chart theming)
+      // in sync with localStorage on every load, not just on a toggle click -- so a
+      // preference set before this cookie mirroring existed still self-heals.
+      document.cookie = "nn_lab_theme=" + theme + "; path=/; max-age=31536000; samesite=lax";
+      if (localStorage.getItem("nn_lab_sidebar_collapsed") === "1") {
+        document.documentElement.classList.add("sidebar-collapsed");
+      }
+    } catch (e) {}
+  })();
+  </script>
+  <title>nn_lab -- LLM benchmark report (Stage 12)</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/vendor/htmx/htmx.min.js"></script>
+  <script src="/static/vendor/plotly/plotly.min.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  {% include "_nav.html" %}
+  <main>
+  <h1>📑 LLM benchmark report</h1>
+  <p>Stage 12: dataset overview, pass-rate/latency/quality charts, and a weighted model leaderboard
+     over one run's persisted responses -- read-only, no new metrics.</p>
+
+  {% if runs %}
+  <label>
+    Run
+    <select name="run_id" hx-get="/benchmark/report" hx-trigger="change" hx-target="#benchmark-report" hx-swap="outerHTML">
+      {% for run in runs %}
+      <option value="{{ run.run_id }}" {% if run.run_id == selected_run_id %}selected{% endif %}>
+        {{ run.run_id }} ({{ run.started_at }}, {{ run.total_tasks }} tasks)
+      </option>
+      {% endfor %}
+    </select>
+  </label>
+  {% include "_benchmark_report.html" %}
+  {% else %}
+  <p>No experiment runs found yet. Run one first via <a href="/experiments">/experiments</a>.</p>
+  {% endif %}
+  </main>
+</div>
+</body>
+</html>

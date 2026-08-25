@@ -2,26 +2,25 @@
 .venv
 
 
-# Sphinx documentation
-/docs/
-
-
 # idea folder, uncomment if you don't need it
 .idea
 
 
-# Sphinx build output
+# Sphinx build output (docs/source/*.rst and conf.py stay tracked)
 docs/build/
 docs/source/_build/
+docs/.tools/
 
 #other dirs
 
 /.pytest_cache
 /logs/
 /results/
-/__pycache__
+__pycache__/
+*.pyc
 /config.ini
-/tox.ini
 /.tox/
 /config/
 /lib/
+.venv.old-bak/
+.coverage

@@ -1,0 +1,31 @@
+{# Fragment returned by POST /model_evo/evaluate, swapped into #model-evo-results. #}
+{% if not has_data %}
+<p>No responses found for run <code>{{ selected_run_id }}</code>.</p>
+{% elif error %}
+<p><strong>Evaluation failed:</strong> {{ error }}</p>
+{% else %}
+<h3>📊 Evaluation metrics</h3>
+<table>
+  <tbody>
+    <tr><th>Precision</th><td>{{ precision }}</td></tr>
+    <tr><th>Recall</th><td>{{ recall }}</td></tr>
+    <tr><th>F1 score</th><td>{{ f1_score }}</td></tr>
+    <tr><th>ROC-AUC</th><td>{{ roc_auc }}</td></tr>
+  </tbody>
+</table>
+
+<h3>🔀 Confusion matrix</h3>
+{{ confusion_matrix_table | safe }}
+{{ confusion_matrix_chart | safe }}
+
+<h3>📑 Classification report</h3>
+<pre>{{ classification_report }}</pre>
+
+<h3>🧠 Top predictive features</h3>
+{% if top_features_table %}
+{{ top_features_table | safe }}
+{% if top_features_chart %}{{ top_features_chart | safe }}{% endif %}
+{% else %}
+<p>No features available.</p>
+{% endif %}
+{% endif %}

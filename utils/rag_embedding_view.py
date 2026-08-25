@@ -38,13 +38,15 @@ def load_chunks(folder_path):
                     category, content = c.split("|", 1)
                 else:
                     category, content = "Uncategorized", c
-                data.append({
-                    "archetype": archetype,
-                    "category": category.strip(),
-                    "text": content.strip(),
-                    "chunk_index": i,
-                    "progress": i / total if total > 1 else 0
-                })
+                data.append(
+                    {
+                        "archetype": archetype,
+                        "category": category.strip(),
+                        "text": content.strip(),
+                        "chunk_index": i,
+                        "progress": i / total if total > 1 else 0,
+                    }
+                )
         logger.info(f"Loaded {len(data)} chunks from {folder_path}")
     except Exception as e:
         logger.error(f"Error loading chunks: {e}")
@@ -54,6 +56,7 @@ def load_chunks(folder_path):
 # -----------------------------
 # CHUNK ANALYSIS
 # -----------------------------
+
 
 def analyze_chunks(df, output_dir):
     """
@@ -70,26 +73,18 @@ def analyze_chunks(df, output_dir):
         # 2. Distribution of chunk lengths
         df["length"] = df["text"].apply(len)
         fig_len = px.histogram(
-            df, x="length", color="archetype",
-            nbins=50,
-            title="Chunk Length Distribution by Archetype"
+            df, x="length", color="archetype", nbins=50, title="Chunk Length Distribution by Archetype"
         )
         fig_len.write_html(os.path.join(output_dir, "chunk_length_distribution.html"))
         logger.info("Saved chunk_length_distribution.html")
 
         # 3. Progress coverage per archetype
-        fig_prog = px.box(
-            df, x="archetype", y="progress", color="archetype",
-            title="Narrative Progress Distribution"
-        )
+        fig_prog = px.box(df, x="archetype", y="progress", color="archetype", title="Narrative Progress Distribution")
         fig_prog.write_html(os.path.join(output_dir, "progress_distribution.html"))
         logger.info("Saved progress_distribution.html")
 
         # 4. Heatmap of chunk index vs length
-        fig_heat = ff.create_2d_density(
-            df["chunk_index"], df["length"],
-            colorscale="Viridis"
-        )
+        fig_heat = ff.create_2d_density(df["chunk_index"], df["length"], colorscale="Viridis")
         fig_heat.update_layout(title="Chunk Index vs Length Density")
         fig_heat.write_html(os.path.join(output_dir, "chunk_index_length_heatmap.html"))
         logger.info("Saved chunk_index_length_heatmap.html")
@@ -145,9 +140,7 @@ def plot_with_dynamics(df, coords, output_dir):
 
         # PLOT 1: Scatter plot (Spatial distribution)
         fig1 = px.scatter(
-            df, x="x", y="y", color="archetype",
-            hover_data=["text"],
-            title="1. Embedding Space Map (Clusters)"
+            df, x="x", y="y", color="archetype", hover_data=["text"], title="1. Embedding Space Map (Clusters)"
         )
         fig1.write_html(os.path.join(output_dir, "embedding_space_map.html"))
         logger.info("Saved embedding_space_map.html")
@@ -163,7 +156,7 @@ def plot_with_dynamics(df, coords, output_dir):
             points="all",
             hover_data=["text", "progress"],
             title="2. Deviation Analysis: Archetype Variance & Outliers (PCA 1)",
-            labels={"x": "Semantic Value (PCA Axis 1)", "archetype": "Archetype"}
+            labels={"x": "Semantic Value (PCA Axis 1)", "archetype": "Archetype"},
         )
         fig2.write_html(os.path.join(output_dir, "deviation_analysis.html"))
         logger.info("Saved deviation_analysis.html")
@@ -176,9 +169,9 @@ def plot_with_dynamics(df, coords, output_dir):
             color="archetype",
             hover_data=["text"],
             title="3. Narrative Dynamics (Vector drift from start to end)",
-            labels={"progress": "File Start ———> File End", "x": "Semantic Vector (PCA 1)"}
+            labels={"progress": "File Start ———> File End", "x": "Semantic Vector (PCA 1)"},
         )
-        fig3.update_traces(line=dict(width=1.5), marker=dict(size=4), mode='lines+markers')
+        fig3.update_traces(line=dict(width=1.5), marker=dict(size=4), mode="lines+markers")
         fig3.write_html(os.path.join(output_dir, "narrative_dynamics.html"))
         logger.info("Saved narrative_dynamics.html")
 

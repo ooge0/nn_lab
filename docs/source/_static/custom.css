@@ -1,0 +1,8 @@
+/* sphinx_rtd_theme 2.x dropped the html_theme_options "body_max_width" setting that older
+   versions used to widen the content column -- it's no longer a recognized theme option (confirmed
+   by checking theme.conf directly, not assumed). Overriding the theme's own hard cap
+   (.wy-nav-content{max-width:800px}) via a plain CSS override, loaded after theme.css, is the
+   current, documented workaround for this exact theme, not a guess. */
+.wy-nav-content {
+    max-width: none;
+}

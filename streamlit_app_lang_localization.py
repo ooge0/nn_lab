@@ -17,7 +17,7 @@ import streamlit as st
 from loguru import logger
 from openai import OpenAI
 
-from core.rag.ingestion import RAGEngine
+from core.adapters.rag.ingestion import RAGEngine
 from core.analysis.model_evaluation import ModelEvaluation
 from tmp.simple_plotty_staff import get_high_dim_dashboard
 
@@ -1232,7 +1232,7 @@ Generate response using retrieved archetype information.
                                     "system_prompt": iter_sys_prompt,
                                     "student": student,
                                     "teacher": judge,
-                                    "sweet_param": current_sweep,
+                                    "sweep_param": current_sweep,
                                     "v_ok": v_ok,
                                     "v_ok_numeric": int(v_ok),
                                     "val": v_val,
@@ -1319,8 +1319,8 @@ with tab_perf:
         # --- 1. Calculate General Metrics ---
         total_records = len(df)
 
-        # Determine Sweep Info (using 'sweet_param' and 'val' from your JSONL)
-        sweep_name = df['sweet_param'].iloc[0] if 'sweet_param' in df.columns else "N/A"
+        # Determine Sweep Info (using 'sweep_param' and 'val' from your JSONL)
+        sweep_name = df['sweep_param'].iloc[0] if 'sweep_param' in df.columns else "N/A"
         if 'val' in df.columns:
             val_min = df['val'].min()
             val_max = df['val'].max()

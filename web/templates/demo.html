@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>
+  (function(){
+    try {
+      var theme = localStorage.getItem("nn_lab_theme") === "light" ? "light" : "dark";
+      if (theme === "light") {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+      // Keeps the server-side cookie (read by web/plotting/render.py for chart theming)
+      // in sync with localStorage on every load, not just on a toggle click -- so a
+      // preference set before this cookie mirroring existed still self-heals.
+      document.cookie = "nn_lab_theme=" + theme + "; path=/; max-age=31536000; samesite=lax";
+      if (localStorage.getItem("nn_lab_sidebar_collapsed") === "1") {
+        document.documentElement.classList.add("sidebar-collapsed");
+      }
+    } catch (e) {}
+  })();
+  </script>
+  <title>nn_lab -- SSE demo (Stage 1)</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/vendor/htmx/htmx.min.js"></script>
+  <script src="/static/vendor/htmx/sse.js"></script>
+</head>
+<body>
+  <h1>SSE + background-thread demo</h1>
+  <p>
+    Throwaway proof of the live-progress mechanism (Stage 1 of the FastAPI
+    rewrite) -- replaced by the real experiment runner in Stage 5.
+  </p>
+  <button hx-post="/demo/start" hx-target="#demo-container" hx-swap="innerHTML">
+    Start ({{ total_steps }} steps)
+  </button>
+  <div id="demo-container"></div>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{# Fragment returned by POST /experiments/start, swapped into #experiment-container. #}
+{% if error %}
+<p class="experiment-error">{{ error }}</p>
+{% else %}
+<div hx-ext="sse" sse-connect="/experiments/stream" sse-close="progress-done">
+  <div id="experiment-progress" sse-swap="progress">Starting&hellip;</div>
+</div>
+{% endif %}

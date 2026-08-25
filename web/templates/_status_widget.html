@@ -1,0 +1,7 @@
+<div id="service-status" class="status-widget">
+  {% for s in services %}
+  <span class="status-badge {{ 'status-ok' if s.ok else 'status-fail' }}" title="{{ s.detail }}">
+    {{ s.name }} {{ '✅' if s.ok else '❌' }}
+  </span>
+  {% endfor %}
+</div>

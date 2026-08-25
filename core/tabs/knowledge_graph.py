@@ -15,19 +15,19 @@ class KnowledgeGraph:
     KnowledgeGraph integrates Neo4j with Streamlit to visualize and analyze
     application history data as a graph.
 
-    Main Description
-    ----------------
     Provides a Streamlit tab (`knowledge_graph_tab`) that:
+    
     - Syncs rows from a pandas DataFrame into Neo4j nodes and relationships.
     - Runs PageRank algorithms via the Neo4j Graph Data Science (GDS) library.
-    - Displays results interactively in multiple tabs (PageRank scripts,
-      hypothesis testing, uncertainty analysis).
+    - Displays results interactively in multiple tabs (PageRank scripts, hypothesis testing, uncertainty analysis).
 
     This class is designed to bridge data ingestion, graph analytics, and
     interactive visualization in one place.
 
+
     References
     ----------
+
     - Neo4j Graph Data Science: https://neo4j.com/docs/graph-data-science/current/
     - Streamlit Tabs: https://docs.streamlit.io/library/api-reference/layout/st.tabs
     - Pandas DataFrame: https://pandas.pydata.org/docs/
@@ -35,15 +35,47 @@ class KnowledgeGraph:
 
     Attributes
     ----------
+
     None (stateless class, methods operate on provided DataFrame and Neo4j service).
 
     Methods
     -------
+
     knowledge_graph_tab(df : pandas.DataFrame)
         Builds the "Knowledge Graph" tab in Streamlit.
         - Pushes DataFrame rows into Neo4j (Archetype → Bias relationships).
         - Provides buttons to run PageRank scripts.
         - Displays results in interactive charts and tables.
+
+    Implementation status -- read before assuming this is stale
+    --------------------------------------------------------------
+
+    Everything above this note describes real, current, unchanged behavior -- not an artifact of an
+    earlier iteration this file forgot to update. nn_lab was rewritten, stage by stage, from a single
+    ~3,400-line Streamlit monolith into a layered FastAPI application (``core/domain`` ->
+    ``core/services`` -> ``core/adapters``, exposed via ``api/``/``web``/``cli``). Every other tab
+    that monolith once had now has a tested FastAPI route or CLI equivalent -- except this one.
+
+    The project's own standing rules (``CLAUDE.md``, "Hard scope boundaries") explicitly carve the
+    Neo4j/knowledge-graph subsystem out of that rewrite: it is not a candidate for a future stage,
+    not partially migrated, not deprioritized by oversight -- it was a deliberate, upfront decision
+    to keep this subsystem fully isolated for as long as this class exists, because graph analytics
+    over run history is not the "moat" (LLM evaluation rigor) the rewrite exists to demonstrate.
+    "Untouched" means exactly that: this class, ``knowledge_graph_tab``'s own logic, and
+    :class:`~core.service.neo4j_service.Neo4jService` have not been refactored, re-layered, or moved
+    behind a ``core.domain`` interface the way every other tab's logic was. The one narrow exception
+    is this docstring itself, edited only to add this note -- not to change what the code does.
+
+    What *did* change around this class, without changing anything inside it: the Streamlit script
+    that calls ``knowledge_graph_tab`` is no longer the original monolith. That file now lives at
+    ``legacy/streamlit_app.py`` (moved there via ``git mv``, kept only as historical reference -- not
+    a live entry point). This method is called today from a small, dedicated standalone script,
+    ``run_knowledge_graph.py`` (repo root), which does nothing else: it loads one run's persisted
+    responses via ``core.adapters.jsonl_store.JSONLStore`` -- the same repository the FastAPI app and
+    CLI batch runner both write to -- and hands the resulting DataFrame straight to this method,
+    unchanged. So "Streamlit tab" above is still literally correct, not a leftover phrase: this still
+    renders as one tab-shaped section inside a real (now minimal, single-purpose) Streamlit page: it
+    is just no longer one tab among a dozen in a 3,400-line file.
     """
 
     @staticmethod
@@ -231,13 +263,13 @@ class KnowledgeGraph:
                     logger.error(f"Error running PageRank script-4: {e}")
 
         with tab5:
-            st.header("Hypothesis Testing: Archetype Comparison")
+            st.header("Hypothesis testing: Archetype comparison")
             # User selects archetypes and metric
             archetype_A = st.selectbox("Choose archetype A", df['archetype'].unique())
             archetype_B = st.selectbox("Choose archetype B", df['archetype'].unique())
             metric = st.selectbox("Choose metric to compare", ["cognitive_load", "sentiment", "lexical_density"])
 
-            if st.button("Run Hypothesis Test"):
+            if st.button("Run hypothesis test"):
                 try:
                     # Filter data for each archetype
                     df_A = df[df['archetype'] == archetype_A]

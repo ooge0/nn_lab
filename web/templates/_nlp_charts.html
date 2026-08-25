@@ -1,0 +1,37 @@
+{# Fragment returned by GET /nlp/charts, swapped into #nlp-charts. #}
+<div id="nlp-charts">
+  {% if not has_data %}
+  <p>No responses found for run <code>{{ selected_run_id }}</code>.</p>
+  {% else %}
+
+  <div class="tabset">
+    <div class="tabset-nav">
+      <button type="button" class="tab-btn" data-tab="nlp-1">NLP-1 -- POS &amp; cognitive</button>
+      <button type="button" class="tab-btn" data-tab="nlp-2">NLP-2 -- stability &amp; repetition</button>
+      <button type="button" class="tab-btn" data-tab="nlp-3">NLP-3 -- structure &amp; coherence</button>
+    </div>
+
+    <section class="tab-panel" id="nlp-1">
+      <p class="hint">POS morphology, cognitive complexity, emotional engagement</p>
+      {% for title, chart_html in nlp1_charts %}
+      {{ chart_html | safe }}
+      {% endfor %}
+    </section>
+
+    <section class="tab-panel" id="nlp-2">
+      <p class="hint">Emotional stability, repetition/fixation</p>
+      {% for title, chart_html in nlp2_charts %}
+      {{ chart_html | safe }}
+      {% endfor %}
+    </section>
+
+    <section class="tab-panel" id="nlp-3">
+      <p class="hint">Sentence structure, neuropsychological metrics, coherence</p>
+      {% for title, chart_html in nlp3_charts %}
+      {{ chart_html | safe }}
+      {% endfor %}
+    </section>
+  </div>
+
+  {% endif %}
+</div>

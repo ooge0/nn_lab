@@ -1,0 +1,450 @@
+/* web/static/style.css
+ *
+ * Design system: VS Code Dark+ continuation, not a separate "product" style --
+ * the user lives in this palette for multi-hour LLM-testing sessions, so the
+ * app extends it rather than competing with it. Color is signal, not decor:
+ * the four functional accents (pass/fail/warning/link) are deliberately
+ * distinct from typical syntax-highlighting hues in an adjacent code/JSON
+ * pane. Generous spacing, thin dividers over boxed borders/fills, no shadows,
+ * no rounded-pill chrome, nothing animated without a functional reason.
+ */
+
+:root {
+  /* chrome -- VS Code Dark+, the default theme (see body's early-init script: light is opt-in) */
+  --bg: #1e1e1e;
+  --surface: #252526;
+  --surface-hover: #2d2d2d;
+  --border: #3c3c3c;
+  --text: #d4d4d4;
+  --text-muted: #8a8a8a;
+
+  /* functional accents -- color as signal, not decoration. Kept identical across
+     themes on purpose: all four are mid-tone/mid-saturation enough to stay
+     readable on both a dark and a light background, and a signal color that
+     changes hue between themes would undermine "color = signal, not decor." */
+  --pass: #7fb069;
+  --fail: #c1666b;
+  --warning: #d4a24c;
+  --link: #6c8ebf;
+
+  /* typography */
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "SF Mono", Menlo, Monaco, monospace;
+
+  --radius: 4px;
+}
+
+/* VS Code Light+ continuation -- opt-in via the theme toggle (see ui.js), not
+   prefers-color-scheme: the app was designed dark-first and stays dark by
+   default even on a light-OS-theme machine, matching CLAUDE.md's "dark is
+   the working default, light is available" framing from the author. */
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --surface: #f3f3f3;
+  --surface-hover: #e8e8e8;
+  --border: #d4d4d4;
+  --text: #1e1e1e;
+  --text-muted: #6e6e6e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: var(--font-ui);
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.5;
+  margin: 0;
+  padding: 1.25rem;
+}
+
+h1 { margin-top: 0; }
+h1, h2, h3 { line-height: 1.25; }
+
+code, pre {
+  font-family: var(--font-mono);
+}
+code {
+  background: var(--surface);
+  padding: 0.1em 0.35em;
+  border-radius: var(--radius);
+  font-size: 0.92em;
+}
+
+/* Numeric table/metric columns -- aligned digits, not proportional-width jitter */
+.num, td.num, th.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+a { color: var(--link); }
+
+/* --- App shell: sidebar + content column --- */
+.app-shell {
+  display: flex;
+  align-items: flex-start;
+  min-height: 100vh;
+  margin: -1.25rem;
+}
+main {
+  flex: 1;
+  min-width: 0;
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 1.75rem 2rem;
+}
+
+/* --- Sidebar navigation ([req]/[corpus]/[sys] grouping) --- */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 14rem;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 1.25rem 1rem;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  overflow-y: auto;
+}
+.sidebar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+.sidebar-brand {
+  font-weight: 600;
+}
+.sidebar-brand a {
+  color: var(--text);
+  text-decoration: none;
+}
+.sidebar-icon-row {
+  display: flex;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+.sidebar-icon-row button {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  padding: 0.2rem 0.45rem;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+.sidebar-icon-row button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+  filter: none;
+}
+.nav-group {
+  margin-bottom: 1.25rem;
+}
+.nav-group-label {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+  letter-spacing: 0.02em;
+}
+.nav-group a {
+  display: block;
+  padding: 0.3rem 0.5rem;
+  margin: 0 -0.5rem;
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--text);
+}
+.nav-group a:hover {
+  background: var(--surface-hover);
+}
+.nav-group a.active {
+  background: var(--surface-hover);
+  color: var(--link);
+}
+
+/* --- Sidebar collapse (persisted client-side, see ui.js) --- */
+html.sidebar-collapsed .sidebar { display: none; }
+.sidebar-expand-btn {
+  display: none;
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 10;
+  background: var(--surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.2rem 0.5rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.sidebar-expand-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+html.sidebar-collapsed .sidebar-expand-btn { display: block; }
+
+/* Legacy flat nav (demo.html only -- deliberately outside the sidebar, see its own docstring) */
+nav.flat-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0;
+}
+nav.flat-nav a {
+  color: var(--link);
+  text-decoration: none;
+  padding: 0.15rem 0.1rem;
+}
+nav.flat-nav a:hover { text-decoration: underline; }
+
+/* --- Forms --- */
+form fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.1rem 1.1rem;
+  margin: 0 0 1rem;
+}
+form legend {
+  font-weight: 600;
+  padding: 0 0.4rem;
+}
+form label {
+  display: block;
+  margin: 0.7rem 0;
+  font-weight: 500;
+}
+input, select, textarea, button {
+  font: inherit;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+/* Every real form control drops to its own line below the label text and fills
+   the column -- the label text is often longer than the control is wide
+   (e.g. "select at least one (Ctrl/Cmd-click for multiple)"), and leaving
+   inputs inline-level let long label text wrap *around* a tall <select
+   multiple> like a floated 90s-web layout instead of stacking cleanly. */
+input:not([type="checkbox"]), select, textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+}
+input[type="checkbox"] {
+  width: auto;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+}
+select[multiple] {
+  padding: 0.25rem;
+}
+select[multiple] option:checked {
+  background: var(--surface-hover) linear-gradient(0deg, var(--surface-hover) 0%, var(--surface-hover) 100%);
+  color: var(--link);
+}
+option {
+  background: var(--surface);
+  color: var(--text);
+}
+input:disabled, select:disabled {
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+label.disabled-field {
+  color: var(--text-muted);
+}
+label.inline {
+  display: flex;
+  align-items: center;
+}
+.hint {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 0.88em;
+}
+
+/* --- Grid layout for grouped fieldsets (e.g. the experiment form) --- */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.form-grid fieldset { margin: 0; }
+
+/* --- Setup summary panel (pre-run recap) --- */
+#task-preview {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  background: var(--surface);
+}
+#task-preview p.over-cap {
+  color: var(--fail);
+}
+#task-preview dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.2rem 0.75rem;
+  margin: 0.5rem 0 0;
+}
+#task-preview dt { color: var(--text-muted); }
+#task-preview dd { margin: 0; }
+button {
+  background: var(--link);
+  color: #1e1e1e;
+  border-color: var(--link);
+  cursor: pointer;
+  padding: 0.5rem 1.1rem;
+  font-weight: 600;
+}
+button:hover { filter: brightness(1.15); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* htmx's own convention: elements carrying .htmx-indicator are hidden until htmx adds
+   .htmx-request to them (via hx-indicator) for the duration of an in-flight request -- used by
+   the "Send to DB" button (and any future action button) so a slow request shows visible progress
+   instead of looking unresponsive, distinct from hx-disabled-elt (which prevents the double-click
+   itself, not just the visual feedback). */
+.htmx-indicator { opacity: 0; display: inline-block; transition: opacity 150ms ease-in; }
+.htmx-request.htmx-indicator, .htmx-request .htmx-indicator { opacity: 1; }
+.spinner {
+  width: 0.85em;
+  height: 0.85em;
+  margin-left: 0.5rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: middle;
+  animation: nn-spin 0.6s linear infinite;
+}
+@keyframes nn-spin { to { transform: rotate(360deg); } }
+
+/* --- Tables -- thin row dividers, not a boxed grid --- */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+  font-size: 0.94em;
+}
+th, td {
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+th.col-center, td.col-center {
+  text-align: center;
+}
+/* Renders the embedded newline in a formatted sync timestamp ("YYYY-MM-DD\nHH:MM:SS UTC") as a
+   real two-line break, without a <br> (Jinja2 autoescaping would render one as literal text, not
+   markup) or splitting the table cell into two rows. */
+.sync-timestamp {
+  white-space: pre-line;
+}
+th {
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+
+/* --- Progress / status --- */
+progress {
+  width: 100%;
+  height: 1.1rem;
+  accent-color: var(--link);
+}
+#experiment-progress, #demo-progress {
+  margin: 1rem 0;
+}
+
+/* --- Errors / warnings --- */
+.error, .experiment-error, .over-cap {
+  color: var(--fail);
+  border-left: 3px solid var(--fail);
+  padding: 0.5rem 0.9rem;
+  background: transparent;
+}
+.warning-text {
+  color: var(--warning);
+  border-left: 3px solid var(--warning);
+  padding: 0.5rem 0.9rem;
+}
+
+/* --- Sub-tabs (analytics, nlp, clusters) -- see web/static/tabs.js --- */
+.tabset-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.25rem;
+}
+.tab-btn {
+  font: inherit;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.5rem 1.1rem;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+.tab-btn:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+.tab-btn.active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom: 2px solid var(--link);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* --- Misc containers --- */
+details {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.9rem;
+  margin: 0.75rem 0;
+}
+summary { cursor: pointer; font-weight: 600; }
+
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.5rem 0;
+}
+
+/* --- Service status widget (Ollama/NLTK reachability, see /status) --- */
+.status-widget {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0.75rem 0 1.25rem;
+}
+.status-badge {
+  display: inline-block;
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+}
+.status-badge.status-ok {
+  color: var(--pass);
+  border-color: var(--pass);
+}
+.status-badge.status-fail {
+  color: var(--fail);
+  border-color: var(--fail);
+}

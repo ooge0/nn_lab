@@ -29,7 +29,7 @@ MODEL_PERF = {
     "qwen:latest": 6,
     "tinyllama:latest": 5,
     "phi3:latest": 3,
-    "mistral:7b-instruct-q4_K_M": 9
+    "mistral:7b-instruct-q4_K_M": 9,
 }
 
 # Base profiles for archetypes (POS only ADJ, NOUN, VERB)
@@ -55,7 +55,7 @@ STRATEGIES = {
     "Structured": "Structural Analyst",
     "Expressive": "Behavioral conditioning (Tuned)",
     "Detached": "Abstract Conceptualizer",
-    "Defensive": "Systemic Evaluator"
+    "Defensive": "Systemic Evaluator",
 }
 
 SELF_FOCUS = {
@@ -65,13 +65,7 @@ SELF_FOCUS = {
     "Detached": 0.55,
     "Defensive": 0.75,
 }
-COGNITIVE_LOAD = {
-    "Neutral": 2.0,
-    "Structured": 3.5,
-    "Expressive": 4.0,
-    "Detached": 1.5,
-    "Defensive": 3.0
-}
+COGNITIVE_LOAD = {"Neutral": 2.0, "Structured": 3.5, "Expressive": 4.0, "Detached": 1.5, "Defensive": 3.0}
 
 # Bias adjustments for rigidity
 bias_adjust = {"positive": -0.15, "neutral": 0.0, "negative": 0.1, "toxic": 0.25}
@@ -109,6 +103,7 @@ def compute_zipf_deviation(text, top_n=50):
     norm_score = rmse / max(observed) if max(observed) > 0 else 0.0
     return round(norm_score, 4)
 
+
 def generate_record(step: int, archetype, bias, student, teacher, sweep_mode="None"):
     v_ok = random.random() > 0.1
 
@@ -119,10 +114,10 @@ def generate_record(step: int, archetype, bias, student, teacher, sweep_mode="No
     base_pres = 0.2
 
     if sweep_mode == "None":
-        sweet_param = "Baseline"
+        sweep_param = "Baseline"
         val = base_temp
     else:
-        sweet_param = sweep_mode
+        sweep_param = sweep_mode
         val = round(0.1 + (step / NUM_RECORDS) * (1.5 - 0.1), 3)
 
     # Latency scaled by model performance
@@ -154,7 +149,7 @@ def generate_record(step: int, archetype, bias, student, teacher, sweep_mode="No
         "system_prompt": sys_prompt,
         "student": student,
         "teacher": teacher,
-        "sweet_param": sweet_param,
+        "sweep_param": sweep_param,
         "v_ok": v_ok,
         "v_ok_numeric": int(v_ok),
         "val": val,
@@ -199,7 +194,7 @@ def generate_record(step: int, archetype, bias, student, teacher, sweep_mode="No
         "expansion_ratio": round(random.uniform(5.0, 50.0), 2),
         "punc_density": round(random.uniform(0.01, 0.1), 3),
         "unique_ratio": round(random.uniform(0.5, 1.0), 3),
-        "zipf_deviation": compute_zipf_deviation(output_text)
+        "zipf_deviation": compute_zipf_deviation(output_text),
     }
     return record
 
@@ -215,7 +210,7 @@ if __name__ == "__main__":
             archetype = random.choice(ARCHETYPES)
             bias = random.choice(BIASES)
             student = random.choice(MODELS)
-            if 'single_teacher':
+            if "single_teacher":
                 teacher = MODELS[0]
             else:
                 teacher = random.choice(MODELS)

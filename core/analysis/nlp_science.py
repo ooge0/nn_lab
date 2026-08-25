@@ -1,3 +1,23 @@
+"""
+nlp_science.py
+
+``PsychScientist`` -- sentiment (VADER), subjectivity (TextBlob), lexical diversity (corrected
+TTR), readability (ARI), POS distribution, self-focus, social-focus, modality, hedging, boosting,
+cognitive density, repetition score, and Zipf-deviation (RMSE between observed and Zipf's-law-
+expected word-frequency-by-rank curve) over one response's text.
+
+``social_focus``/``hedge_ratio``/``booster_ratio`` added 2026-08-24. ``social_focus`` extends the
+existing ``self_focus`` (I-focus) lexicon with the deictic contrast it was missing -- second/third-
+person and collective-other pronouns -- so I-focus vs. social-focus can actually be contrasted, not
+just I-focus reported alone. ``hedge_ratio``/``booster_ratio`` are lexicon-ratio metrics in the same
+style as the existing ``modality``/``self_focus`` fields, drawing on the hedging/boosting category
+from Hyland's (2005) metadiscourse framework -- deliberately *not* a rule-based Speech Act Theory
+classifier (directive/commissive/expressive) or a Gricean-maxim-violation detector, both of which
+would need either a trained classifier or an LLM call to be validity-defensible rather than a
+plausible-sounding but uncalibrated lexicon guess; see CLAUDE.md's own record of this scoping
+decision and ``docs/source/wiki/04-llm-analytics.rst``'s interpretability-debt section.
+"""
+
 from collections import Counter
 
 import nltk
@@ -11,14 +31,104 @@ from textblob import TextBlob
 class PsychScientist:
     def __init__(self):
         self.sia = SentimentIntensityAnalyzer()
-        self.stop_words = set(stopwords.words('english'))
+        self.stop_words = set(stopwords.words("english"))
 
         # --- Psycholinguistic lexicons ---
         self.self_pronouns = {"i", "me", "my", "mine", "myself", "we", "us", "our", "ours", "ourselves"}
+        self.social_pronouns = {
+            "you",
+            "your",
+            "yours",
+            "yourself",
+            "yourselves",
+            "he",
+            "him",
+            "his",
+            "himself",
+            "she",
+            "her",
+            "hers",
+            "herself",
+            "they",
+            "them",
+            "their",
+            "theirs",
+            "themselves",
+        }
         self.modal_verbs = {"must", "should", "need", "have", "ought", "shall", "may", "might", "could", "can", "would"}
         self.cognitive_verbs = {
-            "think", "believe", "understand", "consider", "realize", "assume", "know", "analyze", "judge", "evaluate",
-            "imagine", "remember", "predict", "decide"
+            "think",
+            "believe",
+            "understand",
+            "consider",
+            "realize",
+            "assume",
+            "know",
+            "analyze",
+            "judge",
+            "evaluate",
+            "imagine",
+            "remember",
+            "predict",
+            "decide",
+        }
+        # Hyland (2005) metadiscourse categories -- epistemic hedges (marking uncertainty/tentativeness)
+        # and boosters (marking certainty/emphasis). Single-token only, matching this class's existing
+        # lexicon style; multi-word hedges ("sort of", "kind of") are deliberately not attempted here.
+        self.hedge_words = {
+            "may",
+            "might",
+            "could",
+            "possibly",
+            "possible",
+            "perhaps",
+            "seem",
+            "seems",
+            "seemed",
+            "appear",
+            "appears",
+            "appeared",
+            "suggest",
+            "suggests",
+            "somewhat",
+            "relatively",
+            "generally",
+            "usually",
+            "often",
+            "sometimes",
+            "presumably",
+            "apparently",
+            "roughly",
+            "approximately",
+            "probably",
+            "likely",
+            "assume",
+            "assumes",
+            "estimate",
+            "estimates",
+            "tend",
+            "tends",
+        }
+        self.booster_words = {
+            "definitely",
+            "certainly",
+            "clearly",
+            "obviously",
+            "absolutely",
+            "always",
+            "never",
+            "undoubtedly",
+            "surely",
+            "extremely",
+            "completely",
+            "totally",
+            "very",
+            "highly",
+            "strongly",
+            "conclusively",
+            "indeed",
+            "truly",
+            "unquestionably",
         }
 
         # POS grouping
@@ -26,22 +136,15 @@ class PsychScientist:
             "NOUN": ["NN", "NNS", "NNP", "NNPS"],
             "VERB": ["VB", "VBD", "VBG", "VBN", "VBP", "VBZ"],
             "ADJ": ["JJ", "JJR", "JJS"],
-            "ADV": ["RB", "RBR", "RBS"]
+            "ADV": ["RB", "RBR", "RBS"],
         }
 
     def ensure_nltk(self):
-        resources = [
-            "punkt",
-            "averaged_perceptron_tagger",
-            "stopwords",
-            "vader_lexicon",
-            "wordnet",
-            "omw-1.4"
-        ]
+        resources = ["punkt", "averaged_perceptron_tagger", "stopwords", "vader_lexicon", "wordnet", "omw-1.4"]
         for r in resources:
             try:
                 nltk.data.find(r)
-            except:
+            except LookupError:
                 nltk.download(r)
 
     def zipf_deviation(self, text, top_n=100):
@@ -106,7 +209,10 @@ class PsychScientist:
 
         # --- Psycholinguistic Features ---
         self_focus = sum(1 for w in words if w in self.self_pronouns) / word_count
+        social_focus = sum(1 for w in words if w in self.social_pronouns) / word_count
         modality = sum(1 for w in words if w in self.modal_verbs) / word_count
+        hedge_ratio = sum(1 for w in words if w in self.hedge_words) / word_count
+        booster_ratio = sum(1 for w in words if w in self.booster_words) / word_count
         cognitive_density = sum(1 for w in words if w in self.cognitive_verbs) / word_count
         repetition_score = Counter(words).most_common(1)[0][1] / word_count
 
@@ -141,31 +247,16 @@ class PsychScientist:
             "ms_per_word": round(gen_dur / word_count, 4) if word_count > 0 else 0,
             "word_count": word_count,
             "self_focus": round(self_focus, 3),
+            "social_focus": round(social_focus, 3),
             "modality": round(modality, 3),
+            "hedge_ratio": round(hedge_ratio, 3),
+            "booster_ratio": round(booster_ratio, 3),
             "cognitive_density": round(cognitive_density, 3),
             "repetition_score": round(repetition_score, 3),
             "abstract_ratio": round(abstract_ratio, 3),
             "pos_distribution": pos_distribution,
-            "zipf_deviation": round(self.zipf_deviation(text), 4)
+            "zipf_deviation": round(self.zipf_deviation(text), 4),
         }
-
-        def _empty_result(self):
-            return {
-                "sentiment": 0,
-                "sentiment_variance": 0,
-                "subjectivity": 0,
-                "lexical_density": 0,
-                "corrected_ttr": 0,
-                "readability_ari": 0,
-                "avg_sentence_length": 0,
-                "self_focus": 0,
-                "modality": 0,
-                "cognitive_density": 0,
-                "repetition_score": 0,
-                "abstract_ratio": 0,
-                "pos_distribution": {},
-                "zipf_deviation": 0.0
-            }
 
     def _empty_result(self):
         return {
@@ -177,10 +268,13 @@ class PsychScientist:
             "readability_ari": 0,
             "avg_sentence_length": 0,
             "self_focus": 0,
+            "social_focus": 0,
             "modality": 0,
+            "hedge_ratio": 0,
+            "booster_ratio": 0,
             "cognitive_density": 0,
             "repetition_score": 0,
             "abstract_ratio": 0,
             "pos_distribution": {},
-            "zipf_deviation": 0.0
+            "zipf_deviation": 0.0,
         }

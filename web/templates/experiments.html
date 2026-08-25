@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>
+  (function(){
+    try {
+      var theme = localStorage.getItem("nn_lab_theme") === "light" ? "light" : "dark";
+      if (theme === "light") {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+      // Keeps the server-side cookie (read by web/plotting/render.py for chart theming)
+      // in sync with localStorage on every load, not just on a toggle click -- so a
+      // preference set before this cookie mirroring existed still self-heals.
+      document.cookie = "nn_lab_theme=" + theme + "; path=/; max-age=31536000; samesite=lax";
+      if (localStorage.getItem("nn_lab_sidebar_collapsed") === "1") {
+        document.documentElement.classList.add("sidebar-collapsed");
+      }
+    } catch (e) {}
+  })();
+  </script>
+  <title>nn_lab -- Experiment (Stage 6)</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/vendor/htmx/htmx.min.js"></script>
+  <script src="/static/vendor/htmx/sse.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  {% include "_nav.html" %}
+  <main>
+  <h1>Run an experiment</h1>
+  <p>Stage 6: full <code>tab_gen</code> parity -- judge, prompt mode, parameter sweep, RAG toggle, self-critic.</p>
+
+  <!-- action/method: a plain, working fallback if htmx.js fails to load or is blocked -- without
+       this the form does nothing at all in that case (hx-post silently no-ops, there is no native
+       submission to fall back to). With JS present, htmx intercepts the submit and this attribute
+       is never used. -->
+  <form hx-post="/experiments/start" hx-target="#experiment-container" hx-swap="innerHTML"
+        hx-trigger="submit" id="experiment-form" action="/experiments/start" method="post">
+
+    <div class="form-grid">
+      <fieldset hx-post="/experiments/preview" hx-trigger="change from:#experiment-form, input from:#experiment-form delay:300ms"
+                hx-target="#task-preview" hx-swap="innerHTML">
+        <legend>Models</legend>
+        <label>
+          Students (generators) -- select at least one (Ctrl/Cmd-click for multiple)
+          <select name="student_models" multiple size="5" required>
+            <option value="tinyllama:latest">tinyllama:latest</option>
+            <option value="qwen:latest" selected>qwen:latest</option>
+            <option value="phi3:latest">phi3:latest</option>
+            <option value="llama3:latest">llama3:latest</option>
+            <option value="mistral:7b-instruct-q4_K_M">mistral:7b-instruct-q4_K_M</option>
+          </select>
+        </label>
+        <label class="inline">
+          <input type="checkbox" name="self_critic" id="self_critic"> Self-critic mode (student judges itself)
+        </label>
+        <label>
+          Teacher (judge) <span id="teacher-hint" class="hint" hidden>-- ignored while self-critic is on</span>
+          <select name="teacher_model" id="teacher_model">
+            <option value="qwen:latest" selected>qwen:latest</option>
+            <option value="phi3:latest">phi3:latest</option>
+            <option value="llama3:latest">llama3:latest</option>
+            <option value="tinyllama:latest">tinyllama:latest</option>
+            <option value="mistral:7b-instruct-q4_K_M">mistral:7b-instruct-q4_K_M</option>
+          </select>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Prompt</legend>
+        <label>
+          Strategy
+          <select name="prompt_mode" id="prompt_mode">
+            {% for mode in prompt_modes %}
+            <option value="{{ mode.value }}">{{ mode.value }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="inline">
+          <input type="checkbox" name="exclude_archetype_from_prompt" id="exclude_archetype_from_prompt">
+          Exclude archetype from prompt <span class="hint">(Tuned mode only)</span>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Experiment data</legend>
+        <label>
+          Archetypes -- select at least one (Ctrl/Cmd-click for multiple)
+          <select name="archetypes" multiple size="5" required>
+            {% for name in archetypes %}
+            <option value="{{ name }}">{{ name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          Target biases (comma-separated)
+          <input type="text" name="biases_raw" value="personalization, formal, toxic" required>
+        </label>
+        <label class="inline">
+          <input type="checkbox" name="split_biases"> Split biases (one run per bias instead of the whole string)
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>RAG</legend>
+        <label class="inline"><input type="checkbox" name="rag_enabled" id="rag_enabled"> Enable RAG</label>
+        <label>
+          Mode
+          <select name="rag_mode" id="rag_mode" disabled>
+            <option value="Archetype ONLY">Archetype ONLY</option>
+            <option value="Archetype + Bias" selected>Archetype + Bias</option>
+            <option value="Bias ONLY">Bias ONLY</option>
+          </select>
+        </label>
+        <label>Top-K <input type="number" name="rag_top_k" id="rag_top_k" value="3" min="1" max="20" disabled></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Sampling parameters (base values)</legend>
+        <label>Temperature <input type="number" name="base_temperature" value="0.7" step="0.05" min="0" max="2"></label>
+        <label>Top P <input type="number" name="base_top_p" value="0.9" step="0.05" min="0" max="1"></label>
+        <label>Frequency penalty <input type="number" name="base_frequency_penalty" value="0.0" step="0.05" min="-2" max="2"></label>
+        <label>Presence penalty <input type="number" name="base_presence_penalty" value="0.0" step="0.05" min="-2" max="2"></label>
+        <label>Max tokens <input type="number" name="max_tokens" value="512" min="1"></label>
+        <label>Seed <input type="number" name="seed" value="42"></label>
+      </fieldset>
+
+      <fieldset id="sweep-fieldset">
+        <legend>Parameter sweep</legend>
+        <label>
+          Sweep parameter
+          <select name="sweep_param" id="sweep_param">
+            <option value="">None</option>
+            <option value="Temperature">Temperature</option>
+            <option value="Top P">Top P</option>
+            <option value="Frequency penalty">Frequency penalty</option>
+            <option value="Presence penalty">Presence penalty</option>
+          </select>
+        </label>
+        <label>
+          Mode
+          <select name="sweep_mode" id="sweep_mode" disabled>
+            <option value="Delta" selected>Delta</option>
+            <option value="MIN-MAX">MIN-MAX</option>
+          </select>
+        </label>
+        <label>Delta <input type="number" name="sweep_delta" id="sweep_delta" value="0.2" step="0.05" min="0" max="2" disabled></label>
+        <label class="inline"><input type="checkbox" name="sweep_desc" id="sweep_desc" disabled> Descending (Delta mode only)</label>
+        <label>Explicit min <input type="number" name="sweep_min" id="sweep_min" step="0.05" min="0" max="2" disabled></label>
+        <label>Explicit max <input type="number" name="sweep_max" id="sweep_max" step="0.05" min="0" max="2" disabled></label>
+        <label>Steps <input type="number" name="sweep_steps" id="sweep_steps" value="1" min="1" max="20" disabled></label>
+      </fieldset>
+    </div>
+
+    <div id="task-preview">{% include "_experiment_preview.html" %}</div>
+
+    <button type="submit">Run experiment</button>
+  </form>
+  <div id="experiment-container"></div>
+
+  <script>
+    // Real, per-parameter bounds -- matching the base_* fields' own hardcoded bounds exactly, so a
+    // sweep over e.g. Top P can't be pointed at a Temperature-shaped range (0-2) by accident. Kept
+    // in one place so the "real bounds, not fake" requirement is enforced consistently, not just
+    // decorative min/max attributes nobody wires up.
+    const SWEEP_BOUNDS = {
+      "Temperature":        { min: 0,  max: 2, deltaMax: 2 },
+      "Top P":               { min: 0,  max: 1, deltaMax: 1 },
+      "Frequency penalty":   { min: -2, max: 2, deltaMax: 4 },
+      "Presence penalty":    { min: -2, max: 2, deltaMax: 4 },
+    };
+
+    function byId(id) { return document.getElementById(id); }
+
+    function setDisabled(el, disabled) {
+      el.disabled = disabled;
+      el.closest("label").classList.toggle("disabled-field", disabled);
+    }
+
+    function updateSweepFields() {
+      const param = byId("sweep_param").value;
+      const mode = byId("sweep_mode").value;
+      const sweepActive = param !== "";
+      const deltaMode = mode === "Delta";
+
+      setDisabled(byId("sweep_mode"), !sweepActive);
+      setDisabled(byId("sweep_steps"), !sweepActive);
+      setDisabled(byId("sweep_delta"), !sweepActive || !deltaMode);
+      setDisabled(byId("sweep_desc"), !sweepActive || !deltaMode);
+      setDisabled(byId("sweep_min"), !sweepActive || deltaMode);
+      setDisabled(byId("sweep_max"), !sweepActive || deltaMode);
+
+      const bounds = SWEEP_BOUNDS[param];
+      if (bounds) {
+        byId("sweep_min").min = bounds.min; byId("sweep_min").max = bounds.max;
+        byId("sweep_max").min = bounds.min; byId("sweep_max").max = bounds.max;
+        byId("sweep_delta").max = bounds.deltaMax;
+        if (!byId("sweep_min").value) byId("sweep_min").placeholder = bounds.min;
+        if (!byId("sweep_max").value) byId("sweep_max").placeholder = bounds.max;
+      }
+    }
+
+    function updateTeacherField() {
+      const selfCritic = byId("self_critic").checked;
+      setDisabled(byId("teacher_model"), selfCritic);
+      byId("teacher-hint").hidden = !selfCritic;
+    }
+
+    function updateRagFields() {
+      const ragOn = byId("rag_enabled").checked;
+      setDisabled(byId("rag_mode"), !ragOn);
+      setDisabled(byId("rag_top_k"), !ragOn);
+    }
+
+    function updatePromptModeFields() {
+      const tuned = byId("prompt_mode").value.includes("Tuned");
+      setDisabled(byId("exclude_archetype_from_prompt"), !tuned);
+      if (!tuned) byId("exclude_archetype_from_prompt").checked = false;
+    }
+
+    byId("sweep_param").addEventListener("change", updateSweepFields);
+    byId("sweep_mode").addEventListener("change", updateSweepFields);
+    byId("self_critic").addEventListener("change", updateTeacherField);
+    byId("rag_enabled").addEventListener("change", updateRagFields);
+    byId("prompt_mode").addEventListener("change", updatePromptModeFields);
+
+    updateSweepFields();
+    updateTeacherField();
+    updateRagFields();
+    updatePromptModeFields();
+  </script>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{# Fragment returned by GET /model_evo/targets, swapped into #model-evo-targets. #}
+<div id="model-evo-targets">
+  {% if not has_data %}
+  <p>No responses found for run <code>{{ selected_run_id }}</code>.</p>
+  {% elif not possible_targets %}
+  <p>No suitable target column found. You need a discrete label column (2-10 unique values, not a
+     float) such as <code>archetype</code>, <code>v_ok_numeric</code>, or <code>student</code>.</p>
+  {% else %}
+  <form hx-post="/model_evo/evaluate" hx-target="#model-evo-results" hx-swap="innerHTML">
+    <input type="hidden" name="run_id" value="{{ selected_run_id }}">
+    <label>
+      🎯 Target column
+      <select name="target_column">
+        {% for col in possible_targets %}
+        <option value="{{ col }}">{{ col }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      📦 Test size
+      <input type="range" name="test_size" min="0.1" max="0.5" step="0.05" value="0.2"
+             oninput="this.nextElementSibling.value = this.value">
+      <output>0.2</output>
+    </label>
+    <button type="submit">🚀 Run evaluation</button>
+  </form>
+  {% endif %}
+  <div id="model-evo-results"></div>
+</div>

@@ -1,0 +1,11 @@
+[run]
+omit =
+    core/service/neo4j_service.py
+    core/tabs/knowledge_graph.py
+    utils/other/neo4j_services.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    if TYPE_CHECKING:

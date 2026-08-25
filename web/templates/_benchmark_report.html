@@ -1,0 +1,46 @@
+{# Fragment returned by GET /benchmark/report, swapped into #benchmark-report. #}
+<div id="benchmark-report">
+  {% if not has_data %}
+  <p>No responses found for run <code>{{ selected_run_id }}</code>.</p>
+  {% elif insufficient_columns %}
+  <p>This run predates the full field set (missing student/teacher/word_count/v_ok/ms_per_word/duration_ms) --
+     not enough data for a benchmark report.</p>
+  {% else %}
+
+  <h3>📊 Dataset overview</h3>
+  <table>
+    <tbody>
+      <tr><th>Total samples</th><td>{{ overview.total_samples }}</td></tr>
+      <tr><th>Valid samples</th><td>{{ overview.valid_samples }}</td></tr>
+      <tr><th>Unique students</th><td>{{ overview.unique_students }}</td></tr>
+      <tr><th>Unique teachers</th><td>{{ overview.unique_teachers }}</td></tr>
+    </tbody>
+  </table>
+
+  <h3>✅ Validation success rate</h3>
+  {{ success_chart | safe }}
+
+  <h3>⚡ Performance metrics</h3>
+  {{ perf_chart | safe }}
+
+  {% if quality_chart %}
+  <h3>💎 Quality metrics heatmap</h3>
+  {{ quality_chart | safe }}
+  {% endif %}
+
+  {% if psycho_chart %}
+  <h3>🧠 Psycholinguistic signature</h3>
+  {{ psycho_chart | safe }}
+  {% endif %}
+
+  {% if leaderboard_table %}
+  <h3>🏆 Model leaderboard</h3>
+  {{ leaderboard_table | safe }}
+  {% if champion %}
+  <p><strong>🥇 Champion: {{ champion }}</strong> -- top weighted score across success rate,
+     coherence, and inference speed.</p>
+  {% endif %}
+  {% endif %}
+
+  {% endif %}
+</div>

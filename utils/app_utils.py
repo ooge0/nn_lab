@@ -1,6 +1,7 @@
 import os
 import json
-from loguru import logger   # reuse the same logger configured in streamlit_app.py
+from loguru import logger  # reuse the same logger configured in streamlit_app.py
+
 
 class AppUtils:
     def load_archetypes(self, file_path: str):

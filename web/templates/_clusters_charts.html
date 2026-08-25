@@ -1,0 +1,120 @@
+{# Fragment returned by GET /clusters/charts, swapped into #clusters-charts. #}
+<div id="clusters-charts">
+  {% if not has_data %}
+  <p>No responses found for run <code>{{ selected_run_id }}</code>.</p>
+  {% else %}
+
+  <div class="tabset">
+    <div class="tabset-nav">
+      <button type="button" class="tab-btn" data-tab="kmeans-pca">K-Means (PCA)</button>
+      <button type="button" class="tab-btn" data-tab="hdbscan-density">HDBSCAN (Density)</button>
+      <button type="button" class="tab-btn" data-tab="behavioral-topology">Behavioral topology</button>
+    </div>
+
+    <section class="tab-panel" id="kmeans-pca">
+      {% if kmeans %}
+      {{ kmeans.scatter | safe }}
+      <h3>Axis drivers interpretation</h3>
+      {% if kmeans.pc1_drivers %}{{ kmeans.pc1_drivers | safe }}{% endif %}
+      {% if kmeans.pc2_drivers %}{{ kmeans.pc2_drivers | safe }}{% endif %}
+      {% if kmeans.purity_table %}
+      <h3>Cluster purity (ground truth mapping)</h3>
+      <p>Percentage of each archetype present within the machine-discovered clusters:</p>
+      {{ kmeans.purity_table | safe }}
+      {% endif %}
+      {% else %}
+      <p>Not enough data points (need at least 3 responses) for K-Means clustering.</p>
+      {% endif %}
+    </section>
+
+    <section class="tab-panel" id="hdbscan-density">
+      {% if plain_hdbscan %}
+      {{ plain_hdbscan.scatter | safe }}
+      <p>Outliers (noise): {{ plain_hdbscan.noise_count }} / {{ plain_hdbscan.total }}</p>
+      {% else %}
+      <p>Not enough data points for density clustering.</p>
+      {% endif %}
+    </section>
+
+    <section class="tab-panel" id="behavioral-topology">
+      {% if behavioral_topology %}
+      {% set bt = behavioral_topology %}
+
+      <h3>Latent projection</h3>
+      {{ bt.projection.chart | safe }}
+      <p>
+        Samples: {{ bt.projection.samples }} &middot;
+        Clusters: {{ bt.projection.clusters }} &middot;
+        Outlier rate: {{ bt.projection.outlier_pct }}% &middot;
+        Features: {{ bt.projection.features }}
+      </p>
+
+      <h3>HDBSCAN topology</h3>
+      {{ bt.topology.scatter | safe }}
+      {% if bt.topology.mst %}
+      <p><strong>Minimum spanning tree</strong></p>
+      {{ bt.topology.mst | safe }}
+      {% else %}
+      <p>Minimum spanning tree unavailable for this run (dataset too small, or the plot failed to render).</p>
+      {% endif %}
+      {% if bt.topology.condensed_tree %}
+      <p><strong>Condensed tree</strong></p>
+      {{ bt.topology.condensed_tree | safe }}
+      {% else %}
+      <p>Condensed tree unavailable for this run.</p>
+      {% endif %}
+
+      <h3>Cluster membership</h3>
+      {% if bt.membership.archetype_table %}
+      <p><strong>Archetype distribution</strong></p>
+      {{ bt.membership.archetype_table | safe }}
+      {% endif %}
+      {% if bt.membership.model_table %}
+      <p><strong>Model distribution</strong></p>
+      {{ bt.membership.model_table | safe }}
+      {% endif %}
+      {% if bt.membership.centroid_table %}
+      <p><strong>Feature centroids</strong></p>
+      {{ bt.membership.centroid_table | safe }}
+      {% endif %}
+
+      <h3>Research mode</h3>
+      {% if bt.research.correlation_heatmap %}
+      <p><strong>Feature correlation matrix</strong></p>
+      {{ bt.research.correlation_heatmap | safe }}
+      {% endif %}
+      {% if bt.research.feature_scatter %}
+      <p><strong>{{ bt.research.x_feature }} vs. {{ bt.research.y_feature }} by cluster</strong></p>
+      {{ bt.research.feature_scatter | safe }}
+      {% endif %}
+
+      <h3>Behavioral anomalies</h3>
+      <p>Outlier rate: {{ bt.anomalies.outlier_pct }}%</p>
+      {% if bt.anomalies.by_model_chart %}{{ bt.anomalies.by_model_chart | safe }}{% endif %}
+      {% if bt.anomalies.table_html %}
+      <details>
+        <summary>Full outlier datafeed</summary>
+        {{ bt.anomalies.table_html | safe }}
+      </details>
+      {% else %}
+      <p>No anomalies detected.</p>
+      {% endif %}
+
+      <h3>Fit indices (confirmatory analysis)</h3>
+      <table>
+        <tbody>
+          <tr><th>Silhouette</th><td>{{ "%.3f"|format(bt.fit_indices.silhouette) }}</td></tr>
+          <tr><th>Davies-Bouldin</th><td>{{ "%.3f"|format(bt.fit_indices.davies_bouldin) }}</td></tr>
+          <tr><th>Label alignment (ARI)</th><td>{{ "%.3f"|format(bt.fit_indices.ari) }}</td></tr>
+          <tr><th>Noise ratio</th><td>{{ "%.1f"|format(bt.fit_indices.noise_ratio * 100) }}%</td></tr>
+        </tbody>
+      </table>
+
+      {% else %}
+      <p>Not enough data points (after filtering) for the behavioral topology workflow.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  {% endif %}
+</div>

@@ -7,7 +7,6 @@ from types import SimpleNamespace
 
 import numpy as np
 from faker import Faker
-from sklearn.preprocessing import StandardScaler
 
 fake = Faker()
 
@@ -23,7 +22,7 @@ MODEL_PERF = {
     "qwen:latest": 6,
     "tinyllama:latest": 5,
     "phi3:latest": 3,
-    "mistral:7b-instruct-q4_K_M": 9
+    "mistral:7b-instruct-q4_K_M": 9,
 }
 
 POS_PROFILES = {
@@ -41,7 +40,7 @@ STRATEGIES = {
     "Structured": "Blind mode (Hide label)",
     "Expressive": "Behavioral conditioning (Tuned)",
     "Detached": "Raw / No system prompt",
-    "Defensive": "Behavioral conditioning (Tuned)"
+    "Defensive": "Behavioral conditioning (Tuned)",
 }
 
 
@@ -109,7 +108,7 @@ def generate_record(step, archetype, bias, student, teacher, sweep_mode="None"):
         "system_prompt": sys_prompt,
         "student": student,
         "teacher": teacher,
-        "sweet_param": "Baseline" if sweep_mode == "None" else sweep_mode,
+        "sweep_param": "Baseline" if sweep_mode == "None" else sweep_mode,
         "v_ok": v_ok,
         "v_ok_numeric": int(v_ok),
         "val": val,
@@ -170,12 +169,7 @@ def generate_record(step, archetype, bias, student, teacher, sweep_mode="None"):
 
 # --- Cluster generator for HDBSCAN visualizations ---
 def generate_cluster_dataset(
-        num_records=2000,
-        num_clusters=5,
-        cluster_spread=0.5,
-        noise_fraction=0.1,
-        feature_dim=6,
-        random_seed=42
+    num_records=2000, num_clusters=5, cluster_spread=0.5, noise_fraction=0.1, feature_dim=6, random_seed=42
 ):
     np.random.seed(random_seed)
     data, labels = [], []

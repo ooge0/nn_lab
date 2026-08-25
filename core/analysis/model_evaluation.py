@@ -1,6 +1,12 @@
 # core/model_evaluation.py
+"""
+core.analysis.model_evaluation
 
-import numpy as np
+``ModelEvaluation`` -- a baseline logistic-regression pipeline testing whether a run's linguistic/
+neuro metrics predict a chosen discrete label (e.g. ``archetype``, ``v_ok_numeric``). Wired to
+``/model_evo`` (Stage 11) by :mod:`api.routers.model_evo`.
+"""
+
 import pandas as pd
 
 from sklearn.model_selection import train_test_split
@@ -62,17 +68,13 @@ class ModelEvaluation:
       pipelines.
     """
 
-
     def __init__(self, target_column="label"):
         self.target_column = target_column
 
         self.scaler = StandardScaler()
 
         # Simple interpretable baseline model
-        self.model = LogisticRegression(
-            max_iter=1000,
-            random_state=42
-        )
+        self.model = LogisticRegression(max_iter=1000, random_state=42)
 
         self.feature_names = None
 
@@ -85,9 +87,7 @@ class ModelEvaluation:
         """
 
         if self.target_column not in df.columns:
-            raise ValueError(
-                f"Target column '{self.target_column}' not found."
-            )
+            raise ValueError(f"Target column '{self.target_column}' not found.")
 
         # Remove non-feature columns
         ignore = [
@@ -98,11 +98,7 @@ class ModelEvaluation:
             "text",
         ]
 
-        X = (
-            df.select_dtypes(include=["number"])
-            .drop(columns=ignore, errors="ignore")
-            .copy()
-        )
+        X = df.select_dtypes(include=["number"]).drop(columns=ignore, errors="ignore").copy()
 
         y = df[self.target_column]
 
@@ -124,20 +120,12 @@ class ModelEvaluation:
         X, y = self.prepare_data(df)
 
         if len(X) < 10:
-            raise ValueError(
-                f"Dataset too small for evaluation. Total number of rows ({len(X)}) is less than 10."
-            )
+            raise ValueError(f"Dataset too small for evaluation. Total number of rows ({len(X)}) is less than 10.")
 
         # ---------------------------------------------
         # TRAIN / TEST SPLIT
         # ---------------------------------------------
-        X_train, X_test, y_train, y_test = train_test_split(
-            X,
-            y,
-            test_size=test_size,
-            random_state=42,
-            stratify=y
-        )
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42, stratify=y)
 
         # ---------------------------------------------
         # SCALE
@@ -165,12 +153,7 @@ class ModelEvaluation:
         recall = recall_score(y_test, y_pred, average="macro")
         f1 = f1_score(y_test, y_pred, average="macro")
 
-        roc_auc = roc_auc_score(
-            y_test,
-            y_prob,
-            multi_class="ovr",
-            average="macro"
-        )
+        roc_auc = roc_auc_score(y_test, y_prob, multi_class="ovr", average="macro")
 
         # ---------------------------------------------
         # CONFUSION MATRIX
@@ -181,17 +164,11 @@ class ModelEvaluation:
         # FEATURE IMPORTANCE
         # (Logistic Regression weights)
         # ---------------------------------------------
-        importance_df = pd.DataFrame({
-            "feature": self.feature_names,
-            "weight": self.model.coef_[0]
-        })
+        importance_df = pd.DataFrame({"feature": self.feature_names, "weight": self.model.coef_[0]})
 
         importance_df["abs_weight"] = importance_df["weight"].abs()
 
-        importance_df = importance_df.sort_values(
-            by="abs_weight",
-            ascending=False
-        )
+        importance_df = importance_df.sort_values(by="abs_weight", ascending=False)
 
         # ---------------------------------------------
         # FINAL RESULT
@@ -201,14 +178,9 @@ class ModelEvaluation:
             "recall": round(float(recall), 3),
             "f1_score": round(float(f1), 3),
             "roc_auc": round(float(roc_auc), 3),
-
             "confusion_matrix": cm.tolist(),
-
-            "classification_report":
-                classification_report(y_test, y_pred),
-
-            "top_features":
-                importance_df.head(10).to_dict("records"),
+            "classification_report": classification_report(y_test, y_pred),
+            "top_features": importance_df.head(10).to_dict("records"),
         }
 
     # ---------------------------------------------------

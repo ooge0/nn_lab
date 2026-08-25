@@ -1,0 +1,78 @@
+# =============================================================
+#  claudeignore — nn_lab
+#  Hides generated artifacts, data dumps, vendored libs, and
+#  caches from Claude Code's context. Keeps real source + docs
+#  source + config visible.
+# =============================================================
+
+# --- Experiment data / corpora (large JSONL/TXT dumps, not code) ---
+results/lab_experiment_results/
+results/graph_data/
+results/knowledge_graph_analyses/
+results/pytest_test_results/
+test_data/
+*.jsonl
+
+# --- Generated audit / merged text dumps ---
+utils/project_audit/merged_output.txt
+**/merged_output.txt
+
+# --- Logs ---
+logs/
+*.log
+
+# --- Sphinx: hide GENERATED build only, keep .rst/conf.py source visible ---
+docs/build/
+**/_build/
+*.doctree
+*.pickle
+*.inv
+*.buildinfo
+.nojekyll
+
+# --- Vendored front-end libs (both top-level and config/lib copies) ---
+lib/
+config/lib/
+**/vis-9.1.2/
+**/tom-select/
+*.min.js
+*.min.css
+
+# --- Tooling / build caches ---
+**/.tox/
+**/.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+allure-results/
+allure-report/
+
+# --- Python bytecode / cache ---
+**/__pycache__/
+*.pyc
+*.pyo
+
+# --- Model / weight artifacts (kept from prior file; safe defaults) ---
+*.pt
+*.pth
+*.safetensors
+*.onnx
+*.bin
+*.ckpt
+checkpoints/
+
+# --- Scratch / backups / archives ---
+*.bak
+*.TAG
+*.zip
+
+# --- VCS / editor / OS ---
+.git/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

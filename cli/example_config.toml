@@ -1,0 +1,39 @@
+# Example config for `python -m cli.run_experiment --config cli/example_config.toml`.
+#
+# Top-level keys match core.domain.entities.ExperimentConfig's own field names exactly --
+# this file is loaded straight into ExperimentConfig(**data), so pydantic validates it the
+# same way a web-form submission is validated, no separate CLI schema.
+#
+# sweep_min/sweep_max are the *resolved* endpoints, not the web UI's Delta/MIN-MAX modes --
+# the entity itself doesn't distinguish those (see ExperimentConfig's own docstring), so a
+# config file just states the final range directly.
+
+student_models = ["tinyllama:latest"]
+teacher_model = "tinyllama:latest"
+self_critic = false
+
+archetypes = ["Neutral", "Detached"]
+biases = ["formal"]
+
+# One of: "Behavioral conditioning (Tuned)" / "Blind mode (Hide label)" / "Raw / No system prompt"
+prompt_mode = "Behavioral conditioning (Tuned)"
+exclude_archetype_from_prompt = false
+
+rag_enabled = false
+# rag_mode = "Archetype + Bias"
+# rag_top_k = 5
+
+# One of: "Temperature" / "Top P" / "Frequency penalty" / "Presence penalty" / omit for no sweep
+# sweep_param = "Temperature"
+# sweep_min = 0.4
+# sweep_max = 1.0
+# sweep_steps = 5
+# sweep_ascending = true
+
+base_temperature = 0.7
+base_top_p = 0.9
+base_frequency_penalty = 0.0
+base_presence_penalty = 0.0
+
+# max_tokens = 100
+# seed = 42

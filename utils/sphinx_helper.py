@@ -1,10 +1,8 @@
 import subprocess
-import os
 import sys
 import platform
 import webbrowser
 from pathlib import Path
-
 
 # --- Path setup ---
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -26,12 +24,7 @@ class SphinxHelper:
         print(f"🚀 [OS: {platform.system()}] Generating Diagrams for {project_name}...")
 
         # pyreverse prefix logic
-        cmd = [
-            "pyreverse",
-            "-o", "png",
-            "-p", project_name,
-            str(CORE_DIR)
-        ]
+        cmd = ["pyreverse", "-o", "png", "-p", project_name, str(CORE_DIR)]
 
         try:
             # We run inside the target directory so output drops there
@@ -57,7 +50,7 @@ class SphinxHelper:
         try:
             # shell=True is mandatory for .bat on Windows, optional/safe on Linux
             subprocess.run([make_cmd, builder], cwd=DOCS_DIR, check=True, shell=self.is_windows)
-            print(f"✅ Docs build complete.")
+            print("✅ Docs build complete.")
         except Exception as e:
             print(f"❌ Build failed: {e}")
 

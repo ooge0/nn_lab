@@ -1,10 +1,70 @@
-from typing import Dict
+"""
+calculate_advanced_linguistic_metrics.py
+
+Computes ``LinguisticMetrics`` (lexical density, word count, ms/word, Levenshtein distance to the
+prompt, expansion ratio, punctuation density, and related surface-level statistics) for one
+response.
+
+``semantic_overlap`` is the one field here that is not a pure, model-free computation: it is a
+real sentence-embedding cosine similarity (:class:`sentence_transformers.SentenceTransformer`,
+``all-MiniLM-L6-v2`` -- the same model :mod:`core.adapters.rag.vector_store` already uses, reused
+for consistency rather than adding a second embedding model to the dependency footprint). This
+replaces a prior implementation that computed a plain Jaccard token-set overlap under a
+``semantic_overlap`` field name despite having nothing to do with meaning-level similarity --
+found during a wiki audit of what this project's metrics actually measure (see
+``docs/source/wiki/04-llm-analytics.rst``). The model is loaded lazily, once per process, the same
+pattern :func:`api.routers.experiments._get_knowledge_base` already uses for its own
+``SentenceTransformer``-backed knowledge base -- see ``_get_embedder`` below.
+"""
+
+from typing import Optional
+
 import Levenshtein
+import numpy as np
 from pydantic import BaseModel
+from sentence_transformers import SentenceTransformer
+
+_EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+_embedder: Optional[SentenceTransformer] = None
+
+
+def _get_embedder() -> SentenceTransformer:
+    """Lazily construct (once per process) and return the shared sentence-embedding model."""
+    global _embedder
+    if _embedder is None:
+        _embedder = SentenceTransformer(_EMBEDDING_MODEL_NAME)
+    return _embedder
+
+
+def _semantic_similarity(text_a: str, text_b: str) -> float:
+    """
+    Cosine similarity between the sentence embeddings of two texts.
+
+    Parameters
+    ----------
+    text_a, text_b : str
+
+    Returns
+    -------
+    float
+        Rounded to 2 decimals, clamped to ``[0.0, 1.0]`` -- real sentence-embedding cosine
+        similarity is occasionally, very slightly negative for genuinely unrelated text, which
+        would otherwise produce a nonsensical negative value in any downstream consumer that treats
+        this as a bounded score (e.g. :func:`core.analysis.response_classification.is_echo_response`'s
+        threshold comparison). ``0.0`` if either text is empty after stripping -- embedding an empty
+        string is not a meaningful comparison.
+    """
+    if not text_a.strip() or not text_b.strip():
+        return 0.0
+    embeddings = _get_embedder().encode([text_a, text_b])
+    a, b = embeddings[0], embeddings[1]
+    cosine = float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+    return round(max(0.0, min(1.0, cosine)), 2)
 
 
 class LinguisticMetrics(BaseModel):
     """Validated structure for advanced linguistic metrics."""
+
     levenshtein_dist: int
     semantic_overlap: float
     expansion_ratio: float
@@ -14,11 +74,7 @@ class LinguisticMetrics(BaseModel):
     unique_ratio: float
 
 
-def calculate_advanced_linguistic_metrics(
-    input_text: str,
-    output_text: str,
-    duration_ms: float
-) -> LinguisticMetrics:
+def calculate_advanced_linguistic_metrics(input_text: str, output_text: str, duration_ms: float) -> LinguisticMetrics:
     """
     Calculates advanced linguistic and NLP metrics to evaluate the quality of
     transformations performed by large language models (LLMs).
@@ -32,7 +88,7 @@ def calculate_advanced_linguistic_metrics(
     References
     ----------
     - Levenshtein distance: https://en.wikipedia.org/wiki/Levenshtein_distance
-    - Jaccard similarity: https://en.wikipedia.org/wiki/Jaccard_index
+    - Sentence embeddings / semantic textual similarity: https://www.sbert.net/docs/usage/semantic_textual_similarity.html
     - Vocabulary diversity: https://en.wikipedia.org/wiki/Lexical_diversity
     - Text expansion ratio: https://aclanthology.org/W19-4304/
     - Punctuation density: https://www.sciencedirect.com/science/article/pii/S1877042814037987
@@ -73,9 +129,7 @@ def calculate_advanced_linguistic_metrics(
     except Exception:
         edit_dist = -1  # fallback if library fails
 
-    intersection = input_words.intersection(output_set)
-    union = input_words.union(output_set)
-    jaccard_score = round(len(intersection) / len(union), 2) if union else 1.0
+    semantic_overlap = _semantic_similarity(input_text, output_text)
 
     expansion_ratio = round(word_count / max(1, input_count), 2)
     ms_per_word = round(duration_ms / max(1, word_count), 2)
@@ -87,10 +141,10 @@ def calculate_advanced_linguistic_metrics(
 
     return LinguisticMetrics(
         levenshtein_dist=edit_dist,
-        semantic_overlap=jaccard_score,
+        semantic_overlap=semantic_overlap,
         expansion_ratio=expansion_ratio,
         ms_per_word=ms_per_word,
         punc_density=punc_density,
         word_count=word_count,
-        unique_ratio=unique_ratio
+        unique_ratio=unique_ratio,
     )

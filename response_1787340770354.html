@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>nn_lab -- Experiment (Stage 6)</title>
+  <script src="/static/vendor/htmx/htmx.min.js"></script>
+  <script src="/static/vendor/htmx/sse.js"></script>
+</head>
+<body>
+  <h1>Run an experiment</h1>
+  <p>Stage 6: full <code>tab_gen</code> parity -- judge, prompt mode, parameter sweep, RAG toggle, self-critic.</p>
+
+  <form hx-post="/experiments/start" hx-target="#experiment-container" hx-swap="innerHTML"
+        hx-trigger="submit" id="experiment-form">
+
+    <fieldset hx-post="/experiments/preview" hx-trigger="change from:#experiment-form" hx-target="#task-preview">
+      <legend>Models</legend>
+      <label>
+        Students (generators)
+        <select name="student_models" multiple size="5">
+          <option value="tinyllama:latest">tinyllama:latest</option>
+          <option value="qwen:latest" selected>qwen:latest</option>
+          <option value="phi3:latest">phi3:latest</option>
+          <option value="llama3:latest">llama3:latest</option>
+          <option value="mistral:7b-instruct-q4_K_M">mistral:7b-instruct-q4_K_M</option>
+        </select>
+      </label>
+      <label>
+        <input type="checkbox" name="self_critic"> Self-critic mode (student judges itself)
+      </label>
+      <label>
+        Teacher (judge, ignored if self-critic is on)
+        <select name="teacher_model">
+          <option value="qwen:latest" selected>qwen:latest</option>
+          <option value="phi3:latest">phi3:latest</option>
+          <option value="llama3:latest">llama3:latest</option>
+          <option value="tinyllama:latest">tinyllama:latest</option>
+          <option value="mistral:7b-instruct-q4_K_M">mistral:7b-instruct-q4_K_M</option>
+        </select>
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Prompt</legend>
+      <label>
+        Strategy
+        <select name="prompt_mode">
+          
+          <option value="Behavioral conditioning (Tuned)">Behavioral conditioning (Tuned)</option>
+          
+          <option value="Blind mode (Hide label)">Blind mode (Hide label)</option>
+          
+          <option value="Raw / No system prompt">Raw / No system prompt</option>
+          
+        </select>
+      </label>
+      <label>
+        <input type="checkbox" name="exclude_archetype_from_prompt"> Exclude archetype from prompt (Tuned mode only)
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Experiment data</legend>
+      <label>
+        Archetypes
+        <select name="archetypes" multiple size="5">
+          
+          <option value="Neutral">Neutral</option>
+          
+          <option value="Detached">Detached</option>
+          
+          <option value="Expressive">Expressive</option>
+          
+          <option value="Defensive">Defensive</option>
+          
+          <option value="Structured">Structured</option>
+          
+        </select>
+      </label>
+      <label>
+        Target biases (comma-separated)
+        <input type="text" name="biases_raw" value="personalization, formal, toxic">
+      </label>
+      <label>
+        <input type="checkbox" name="split_biases"> Split biases (one run per bias instead of the whole string)
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>RAG</legend>
+      <label><input type="checkbox" name="rag_enabled"> Enable RAG</label>
+      <label>
+        Mode
+        <select name="rag_mode">
+          <option value="Archetype ONLY">Archetype ONLY</option>
+          <option value="Archetype + Bias" selected>Archetype + Bias</option>
+          <option value="Bias ONLY">Bias ONLY</option>
+        </select>
+      </label>
+      <label>Top-K <input type="number" name="rag_top_k" value="3" min="1" max="20"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Sampling parameters (base values)</legend>
+      <label>Temperature <input type="number" name="base_temperature" value="0.7" step="0.05" min="0" max="2"></label>
+      <label>Top P <input type="number" name="base_top_p" value="0.9" step="0.05" min="0" max="1"></label>
+      <label>Frequency penalty <input type="number" name="base_frequency_penalty" value="0.0" step="0.05" min="-2" max="2"></label>
+      <label>Presence penalty <input type="number" name="base_presence_penalty" value="0.0" step="0.05" min="-2" max="2"></label>
+      <label>Max tokens <input type="number" name="max_tokens" value="512" min="1"></label>
+      <label>Seed <input type="number" name="seed" value="42"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Parameter sweep</legend>
+      <label>
+        Sweep parameter
+        <select name="sweep_param">
+          <option value="">None</option>
+          <option value="Temperature">Temperature</option>
+          <option value="Top P">Top P</option>
+          <option value="Frequency penalty">Frequency penalty</option>
+          <option value="Presence penalty">Presence penalty</option>
+        </select>
+      </label>
+      <label>
+        Mode
+        <select name="sweep_mode">
+          <option value="Delta" selected>Delta</option>
+          <option value="MIN-MAX">MIN-MAX</option>
+        </select>
+      </label>
+      <label>Delta <input type="number" name="sweep_delta" value="0.2" step="0.05" min="0" max="1"></label>
+      <label>Explicit min <input type="number" name="sweep_min" step="0.05"></label>
+      <label>Explicit max <input type="number" name="sweep_max" step="0.05"></label>
+      <label>Steps <input type="number" name="sweep_steps" value="1" min="1" max="20"></label>
+      <label><input type="checkbox" name="sweep_desc"> Descending (Delta mode only)</label>
+    </fieldset>
+
+    <div id="task-preview"></div>
+
+    <button type="submit">Run experiment</button>
+  </form>
+  <div id="experiment-container"></div>
+</body>
+</html>

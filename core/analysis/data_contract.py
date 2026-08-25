@@ -1,7 +1,18 @@
+"""
+data_contract.py
+
+``LabSchema`` -- the standardized, validated shape a raw persisted response is normalized into
+(every field defaulted, so a partial/legacy entry never crashes downstream code). ``LabDataBridge``
+transforms a raw response dict into that schema and builds the resulting DataFrame -- the data path
+:mod:`api.routers.nlp` uses (as opposed to the plain ``pandas.json_normalize`` most other routers
+use directly over raw responses).
+"""
+
 from typing import Optional, List
 
 import pandas as pd
 from pydantic import BaseModel, Field, ConfigDict, field_validator
+
 
 class LabSchema(BaseModel):
     """
@@ -100,7 +111,7 @@ class LabSchema(BaseModel):
     - Sentiment is coerced to float via validator.
     """
 
-    model_config = ConfigDict(populate_by_name=True, extra='ignore')
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
     student: str
     teacher: str
@@ -160,22 +171,24 @@ class LabSchema(BaseModel):
         """
         return float(v) if v is not None else 0.0
 
+
 class LabDataBridge:
     """
-     LabDataBridge provides utilities to transform raw experimental data
-     into validated LabSchema objects and optimized DataFrames.
+    LabDataBridge provides utilities to transform raw experimental data
+    into validated LabSchema objects and optimized DataFrames.
 
-     Responsibilities:
-     - Flatten nested JSON structures into schema-compatible dicts.
-     - Enforce strict typing and memory optimization in DataFrames.
-     - Provide convenience methods for building datasets from history logs.
+    Responsibilities:
+    - Flatten nested JSON structures into schema-compatible dicts.
+    - Enforce strict typing and memory optimization in DataFrames.
+    - Provide convenience methods for building datasets from history logs.
 
-     References
-     ----------
-     - pandas DataFrame optimization: https://pandas.pydata.org/docs/user_guide/scale.html
-     - Pydantic validation: https://docs.pydantic.dev/latest/usage/validation/
-     - POS tagging: https://universaldependencies.org/u/pos/
-     """
+    References
+    ----------
+    - pandas DataFrame optimization: https://pandas.pydata.org/docs/user_guide/scale.html
+    - Pydantic validation: https://docs.pydantic.dev/latest/usage/validation/
+    - POS tagging: https://universaldependencies.org/u/pos/
+    """
+
     @staticmethod
     def transform_raw(raw: dict) -> dict:
         """
@@ -195,7 +208,7 @@ class LabDataBridge:
         -----
         - Nested structures (nlp_raw, neuro_raw) are supported.
         - Sentiment variance twins are consolidated.
-        - Neuro metrics are prefixed with 'neuro_' for clarity.
+        - Neuro metrics are prefixed with ``neuro_`` for clarity.
         """
         # 1. Access nested structures with fallback to root level
         # This ensures compatibility with both flat and nested JSON structures
@@ -206,7 +219,6 @@ class LabDataBridge:
         # 2. Build a flattened data structure
         flat = {
             **raw,  # Carry over all root identifiers (student, archetype, etc.)
-
             # --- NLP Metrics Extraction ---
             # Prioritize extended metrics if available, otherwise use base versions
             "corrected_ttr": nlp.get("corrected_ttr", 0.0),
@@ -214,19 +226,28 @@ class LabDataBridge:
             "lexical_density": nlp.get("lexical_density", 0.0),
             "repetition_score": nlp.get("repetition_score", 0.0),
             "avg_sentence_length": nlp.get("avg_sentence_length", 0.0),
-
             # Consolidate sentiment variance twins (core vs extended)
             "sentiment_variance": nlp.get("sentiment_variance_ext", nlp.get("sentiment_variance", 0.05)),
-
             # --- Neuropsychological Metrics (Prefixed for clear grouping) ---
-            # Mapping raw keys to 'neuro_' prefixed fields expected by Plotly charts
-            "neuro_self_focus": neuro.get("self_focus", 0.8),
+            # Mapping raw keys to 'neuro_' prefixed fields expected by Plotly charts.
+            # self_focus_ext prioritized over self_focus, mirroring the same
+            # extended-over-base convention already used above for
+            # sentiment_variance -- ExperimentRunner (Stage 6) started persisting
+            # self_focus (PsychScientist, broad pronoun set) and self_focus_ext
+            # (NeuroMetrics, narrower set) as two separate keys, where this
+            # mapping previously assumed only one "self_focus" key existed and
+            # would always be NeuroMetrics' value (true only for pre-Stage-6
+            # exports, where the legacy dict-merge collision happened to let
+            # neuro's value win under the unprefixed key). On current data this
+            # silently mislabeled PsychScientist's value as "neuro_self_focus".
+            # Falls back to the bare key for historical exports that predate the
+            # split.
+            "neuro_self_focus": neuro.get("self_focus_ext", neuro.get("self_focus", 0.8)),
             "neuro_rigidity": neuro.get("rigidity", 0.0),
             "neuro_cognitive_load": neuro.get("cognitive_load", 0.0),
             "neuro_coherence": neuro.get("coherence", 0.0),
             "neuro_abstract_ratio_ext": neuro.get("abstract_ratio_ext", 0.0),
             "neuro_modality": neuro.get("modality_ext", 0.0),
-
             # --- POS (Part of Speech) Distribution ---
             # Essential for Ternary Plot morphology analysis
             "pos_adj": pos.get("ADJ", 0.0),
@@ -262,14 +283,14 @@ class LabDataBridge:
             return df
 
         # Convert strings to categories (huge memory saver for LLM names/archetypes)
-        categorical_cols = ['student', 'archetype', 'batch_time', 'bias']
+        categorical_cols = ["student", "archetype", "batch_time", "bias"]
         for col in categorical_cols:
             if col in df.columns:
-                df[col] = df[col].astype('category')
+                df[col] = df[col].astype("category")
 
         # Downcast floats to save space
-        float_cols = df.select_dtypes(include=['float64']).columns
-        df[float_cols] = df[float_cols].apply(pd.to_numeric, downcast='float')
+        float_cols = df.select_dtypes(include=["float64"]).columns
+        df[float_cols] = df[float_cols].apply(pd.to_numeric, downcast="float")
 
         return df
 
@@ -320,10 +341,12 @@ def audit_columns(df: pd.DataFrame) -> pd.DataFrame:
     """
     report = []
     for col in df.columns:
-        report.append({
-            "Column": col,
-            "Null %": round(df[col].isna().mean() * 100, 2),
-            "Unique": df[col].nunique(),
-            "Type": str(df[col].dtype)
-        })
+        report.append(
+            {
+                "Column": col,
+                "Null %": round(df[col].isna().mean() * 100, 2),
+                "Unique": df[col].nunique(),
+                "Type": str(df[col].dtype),
+            }
+        )
     return pd.DataFrame(report).set_index("Column")
