@@ -13,7 +13,29 @@ function activateTab(tabset, panelId) {
   if (!btn || !panel) return false;
   tabset.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b === btn));
   tabset.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("active", p === panel));
+  resizePlotlyChartsIn(panel);
   return true;
+}
+
+// Plotly measures a chart's width from its container the moment Plotly.newPlot() runs -- which,
+// for every non-default tab (and in practice the "default" one too, since its own <script> tag
+// can execute before initTabsets() has applied the .active class that actually makes it visible),
+// happens while the panel is still `display: none` (zero width). Plotly has no way to know later
+// that the container's real size changed, so the chart stays squished until something makes the
+// browser fire a real `resize` event (e.g. a window/zoom change) -- confirmed live: this was
+// reported as "charts render narrower than their container, fixed by nudging browser zoom".
+// Plotly.Plots.resize() re-measures the container and redraws, doing programmatically what a real
+// resize event would trigger by accident.
+function resizePlotlyChartsIn(panel) {
+  if (typeof Plotly === "undefined") return;
+  panel.querySelectorAll(".plotly-graph-div").forEach((div) => {
+    try {
+      Plotly.Plots.resize(div);
+    } catch (e) {
+      // A chart that failed to initialize (e.g. a genuinely empty figure) has nothing to
+      // resize -- not this function's job to diagnose that separately.
+    }
+  });
 }
 
 function initTabsets(root) {

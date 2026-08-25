@@ -25,10 +25,27 @@ _metrics_engine = MetricsEngine(_repository)
 
 @router.get("", response_class=HTMLResponse)
 async def runs_page(request: Request) -> HTMLResponse:
-    """Render the run picker plus the most recently started run's summary, if any runs exist."""
+    """
+    Render the run picker plus the most recently started run's summary, if any runs exist.
+
+    Notes
+    -----
+    A real 500 was found here (not hypothetical): a run whose ``.meta.json`` exists but whose
+    response ``.jsonl`` is empty or missing (a JSONLStore run record with zero persisted
+    responses -- e.g. a crashed/killed run, or a leftover test fixture) made ``summarize_run``
+    raise ``RunNotFoundError`` completely unguarded here, taking down the whole page -- even
+    though the sibling ``/runs/summary`` endpoint two lines below already handles this exact case
+    gracefully. Fixed to match that existing precedent instead of leaving the two endpoints
+    inconsistent.
+    """
     runs = _repository.list_runs()
     selected_run_id = runs[0].run_id if runs else None
-    summary = _metrics_engine.summarize_run(selected_run_id) if selected_run_id else None
+    summary = None
+    if selected_run_id is not None:
+        try:
+            summary = _metrics_engine.summarize_run(selected_run_id)
+        except RunNotFoundError:
+            summary = None
     return templates.TemplateResponse(
         request,
         "perf.html",

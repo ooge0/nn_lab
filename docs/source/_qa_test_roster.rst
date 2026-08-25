@@ -23,31 +23,31 @@ being pulled.
    * - Test
      - Description
    * - ``test_sweep_fields_are_disabled_when_no_sweep_parameter_selected[chromium]``
-     - Description is missing
+     - Regression test for the reported bug: 'Steps' (and every other sweep sub-field) must be disabled while Sweep parameter = None, not silently editable with no effect.
    * - ``test_selecting_a_sweep_parameter_enables_mode_and_steps_and_delta_mode_fields[chromium]``
-     - Description is missing
+     - Choosing a real sweep parameter enables Mode/Steps, and (since Delta is the default mode) the Delta/Descending fields -- but not the MIN-MAX explicit fields.
    * - ``test_switching_sweep_mode_to_minmax_swaps_which_fields_are_enabled[chromium]``
-     - Description is missing
+     - Switching Mode from Delta to MIN-MAX disables Delta/Descending and enables the explicit min/max fields -- mutually exclusive, not all-editable at once.
    * - ``test_choosing_none_again_disables_every_sweep_field_again[chromium]``
-     - Description is missing
+     - Selecting a parameter then switching back to None re-disables everything -- the toggle is fully reversible, not one-way.
    * - ``test_sweep_min_max_bounds_are_real_per_parameter_not_a_fixed_fake_range[chromium-Temperature-0-2]``
-     - Description is missing
+     - Regression test: the explicit min/max fields' own min/max *attributes* (the browser-enforced bounds) must match the selected parameter's real valid range -- e.g. Top P must be bounded to [0, 1], not left at Temperature's [0, 2] regardless of which parameter is actually being swept, which would let an unskilled user submit a nonsensical value.
    * - ``test_self_critic_checkbox_disables_teacher_model_and_shows_hint[chromium]``
-     - Description is missing
+     - Checking self-critic disables the (now-irrelevant) teacher_model select and reveals the 'ignored while self-critic is on' hint.
    * - ``test_rag_enabled_checkbox_enables_rag_mode_and_top_k[chromium]``
-     - Description is missing
+     - RAG mode/Top-K start disabled and only become editable once 'Enable RAG' is checked.
    * - ``test_non_tuned_prompt_mode_disables_and_unchecks_exclude_archetype[chromium]``
-     - Description is missing
+     - 'Exclude archetype from prompt' only makes sense in Tuned mode -- switching away disables it and clears any existing check, rather than silently submitting a no-op checked value.
    * - ``test_submitting_with_no_archetypes_selected_is_blocked_by_the_browser[chromium]``
-     - Description is missing
+     - Regression test: student_models/archetypes are required selects; a browser must refuse to submit the form while archetypes has nothing selected (native HTML5 constraint validation), rather than silently POSTing a config that resolves to a real-but-empty 0-task run.
    * - ``test_preview_panel_updates_live_when_a_field_changes[chromium]``
-     - Description is missing
+     - Changing a real form field triggers a real htmx round-trip to /experiments/preview against the live server, and the setup summary panel reflects the new selection -- not just the bare task count.
    * - ``test_sweep_min_max_bounds_are_real_per_parameter_not_a_fixed_fake_range[chromium-Top P-0-1]``
-     - Description is missing
+     - Regression test: the explicit min/max fields' own min/max *attributes* (the browser-enforced bounds) must match the selected parameter's real valid range -- e.g. Top P must be bounded to [0, 1], not left at Temperature's [0, 2] regardless of which parameter is actually being swept, which would let an unskilled user submit a nonsensical value.
    * - ``test_sweep_min_max_bounds_are_real_per_parameter_not_a_fixed_fake_range[chromium-Frequency penalty--2-2]``
-     - Description is missing
+     - Regression test: the explicit min/max fields' own min/max *attributes* (the browser-enforced bounds) must match the selected parameter's real valid range -- e.g. Top P must be bounded to [0, 1], not left at Temperature's [0, 2] regardless of which parameter is actually being swept, which would let an unskilled user submit a nonsensical value.
    * - ``test_sweep_min_max_bounds_are_real_per_parameter_not_a_fixed_fake_range[chromium-Presence penalty--2-2]``
-     - Description is missing
+     - Regression test: the explicit min/max fields' own min/max *attributes* (the browser-enforced bounds) must match the selected parameter's real valid range -- e.g. Top P must be bounded to [0, 1], not left at Temperature's [0, 2] regardless of which parameter is actually being swept, which would let an unskilled user submit a nonsensical value.
 
 ``tests/integration/test_analytics_api.py`` (7 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

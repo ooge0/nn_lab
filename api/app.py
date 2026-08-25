@@ -19,6 +19,7 @@ from fastapi.templating import Jinja2Templates
 from api._paths import STATIC_DIR, TEMPLATES_DIR
 from api.routers import (
     analytics,
+    api_status,
     benchmark,
     clusters,
     db_export,
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(monitor.router)
     app.include_router(status.router)
     app.include_router(db_export.router)
+    app.include_router(api_status.router)
 
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request) -> HTMLResponse:
