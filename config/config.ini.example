@@ -1,0 +1,49 @@
+; config/config.ini.example
+;
+; Copy this file to config/config.ini before running anything -- config/config.ini is gitignored
+; (it can hold a real Neo4j password) and utils/config_loader_short.py raises FileNotFoundError at
+; IMPORT TIME if it's missing, which means nearly the whole app (uvicorn, the CLI, pytest) fails to
+; even start without it. This is not optional/Neo4j-only setup -- [OLLAMA]/[DIRECTORIES]/[FILES]/
+; [EXPERIMENT] below are required for the core FastAPI app; only [neo4j] is specific to the
+; standalone knowledge-graph explorer (run_knowledge_graph.py) and can be left as placeholder
+; values if you don't use it.
+;
+; Windows:  copy config\config.ini.example config\config.ini
+; Linux:    cp config/config.ini.example config/config.ini
+
+[neo4j]
+user=neo4j
+password=changeme
+uri=bolt://localhost:7687
+
+[rag]
+rag_kb_source_path = knowledge/rag
+
+; Ollama's OpenAI-compatible endpoint. Read by OllamaClient. Keys keep the
+; openai_ prefix because the client library making the calls is the openai
+; SDK (Ollama implements its HTTP API shape) -- the section itself is named
+; for what it actually is: Ollama, not OpenAI.
+[OLLAMA]
+openai_base_url = http://localhost:11434/v1
+openai_api_key = ollama
+
+[DIRECTORIES]
+results_dir = results/lab_experiment_results
+logs_dir = logs
+knowledge_path = knowledge/rag
+
+[FILES]
+log_file_entry = lab_debug.log
+knowledge_path = config/knowledge_base.json
+sys_prompts_defined_file_path = knowledge/sys_prompts_defined.json
+
+; Hard sanity cap on total_tasks = students x archetypes x biases x sweep_steps
+; per declared experiment (Stage 6 -- ExperimentRunner refuses to start a run
+; above this without explicit confirmation). Exists because this app targets
+; single-user bare-metal deployment with no way to scale out of an
+; accidentally huge sweep -- e.g. 3 students x 5 archetypes x 3 biases x 10
+; steps x 10 steps (two swept params) is 4500 calls, ~6-10 hours at measured
+; local-Ollama latency. Raise this only if you know your hardware/models can
+; absorb the runtime.
+[EXPERIMENT]
+max_total_tasks = 500

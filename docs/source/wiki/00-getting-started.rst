@@ -43,6 +43,7 @@ avoid the two copies drifting apart.
     pip install -r requirements-base.txt
     python -c "import nltk; nltk.download('vader_lexicon'); nltk.download('punkt'); nltk.download('punkt_tab'); nltk.download('brown'); nltk.download('averaged_perceptron_tagger_eng')"
     python -m spacy download en_core_web_sm
+    copy config\config.ini.example config\config.ini
 
 **Ubuntu**::
 
@@ -55,6 +56,7 @@ avoid the two copies drifting apart.
     pip install -r requirements-base.txt -r requirements-linux.txt
     python -c "import nltk; nltk.download('vader_lexicon'); nltk.download('punkt'); nltk.download('punkt_tab'); nltk.download('brown'); nltk.download('averaged_perceptron_tagger_eng')"
     python -m spacy download en_core_web_sm
+    cp config/config.ini.example config/config.ini
 
 .. warning::
    ``requirements-linux.txt`` is a **disclosed, unfixed gap** (last regenerated 2026-06-22, before
@@ -62,6 +64,16 @@ avoid the two copies drifting apart.
    it). The Ubuntu install command above may fail to resolve or install a stale set on a fresh
    machine. See :doc:`02-tools-and-stack`'s disclosed-gaps section for the full finding and the
    exact fix (regenerate on real Ubuntu, not fixable from this Windows dev machine).
+
+.. warning::
+   The ``config/config.ini`` step above is **not optional, and not just for Neo4j** --
+   ``config/config.ini`` is gitignored (it can hold a real Neo4j password) and
+   ``utils/config_loader_short.py`` raises ``FileNotFoundError`` at *import time* if it's missing.
+   Since that module is imported by nearly everything (``OllamaClient``, ``JSONLStore``, the
+   status checks, ...), a fresh clone that skips this step fails to even start ``uvicorn`` --
+   confirmed directly, not assumed: this was found while verifying that a fresh clone of this
+   repository actually reaches a working state. The example file's real, working defaults need no
+   edits beyond the ``[neo4j]`` password, and only if ``run_knowledge_graph.py`` is ever used.
 
 **Verify the install**::
 

@@ -184,6 +184,20 @@ CPU-friendly stance, the same reasoning behind picking `all-MiniLM-L6-v2` for em
 python -m spacy download en_core_web_sm
 ```
 
+**6. Create `config/config.ini`** (required -- not just for Neo4j):
+```bash
+# Windows
+copy config\config.ini.example config\config.ini
+# Linux
+cp config/config.ini.example config/config.ini
+```
+`config/config.ini` is gitignored (it can hold a real Neo4j password) and
+`utils/config_loader_short.py` raises `FileNotFoundError` at **import time** if it's missing --
+nearly the whole app (`uvicorn`, the CLI, `pytest`) fails to even start without it, not just the
+Neo4j knowledge-graph explorer. The example file's `[OLLAMA]`/`[DIRECTORIES]`/`[FILES]`/
+`[EXPERIMENT]` sections work as-is; only `[neo4j]`'s placeholder password needs a real value, and
+only if you plan to run `run_knowledge_graph.py` (see **Neo4j setup** below).
+
 ### Dependency Architecture
 
 To prevent heavy CUDA/Triton/NCCL dependency conflicts between Windows and Linux, this project
@@ -323,7 +337,8 @@ cd neo4j-community-*/bin
 ```
 Then open http://localhost:7474, log in with `neo4j`/`neo4j`, and set a new password.
 
-**2. Configure Neo4j credentials** — create `config/config.ini` (not committed to source control):
+**2. Configure Neo4j credentials** — edit the `[neo4j]` section of `config/config.ini` (already
+created in **Installation & Setup**, step 6 above; not committed to source control):
 ```ini
 [neo4j]
 uri = bolt://localhost:7687

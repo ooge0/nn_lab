@@ -20,7 +20,11 @@ __pycache__/
 *.pyc
 /config.ini
 /.tox/
-/config/
+# Only the real secret is excluded -- config.ini.example, config.toml (Streamlit server settings,
+# no secrets), and config/lib/ (vendored JS for the Neo4j knowledge-graph viewer) must stay
+# tracked, or a fresh clone silently can't run either the main app or the KG explorer. Confirmed
+# real: the previous blanket `/config/` rule was hiding all of these, not just config.ini.
+/config/config.ini
 /lib/
 .venv.old-bak/
 .coverage
