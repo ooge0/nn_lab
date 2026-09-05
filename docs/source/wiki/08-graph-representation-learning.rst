@@ -75,6 +75,15 @@ something structural, not an artifact of one particular metric space; disagreeme
 that look similar linguistically but sit in different relational neighborhoods (or vice versa) --
 a genuinely new finding neither method alone could produce.
 
+**A smaller-scale version of this triangulation already happened, 2026-09-05, between Stages 4 and
+5 (not yet the full UMAP/HDBSCAN cross-check described above, which is still open):** Stage 4's
+Leiden run and Stage 5's node-similarity run are two independent GDS algorithms over the same
+projected graph, and they agreed -- Leiden placed Neutral/Detached/Expressive archetypes and qwen/
+tinyllama models in one community; node similarity independently scored those same nodes at
+~0.9999 similarity to each other. Two different algorithms landing on the same grouping from the
+same underlying topology is a real, if modest, instance of exactly the convergent-evidence argument
+this technique is named for.
+
 **4. Structural anomaly / analogy detection (node similarity).** Run ``gds.knn.stream`` over the
 FastRP embeddings to answer two symmetric questions directly: "what is this archetype/bias/model
 structurally most like" (an automatic analogy -- the literal mechanism behind "this reminds me
@@ -166,11 +175,19 @@ applies to the existing UMAP/HDBSCAN pipeline.
   cluster assignments (Technique 3) -- a substantially separate feature needing a join between two
   independent systems' per-response cluster/community labels for the same run, not a small
   addition to this method.
-- **Stage 5 -- node similarity for analogy/anomaly.** ``gds.nodeSimilarity.stream`` over the Stage 4
-  embeddings. *Validate with*: manual spot-check of the top-3 "most similar" pairs and the single
-  most anomalous node against a human read of the underlying real responses -- does the structural
-  claim actually hold up, the same "don't trust the algorithm's output as ground truth" discipline
-  CLAUDE.md SS7 already applies to borrowed metrics.
+- **Stage 5 -- node similarity for analogy/anomaly. Shipped, 2026-09-05.**
+  :meth:`core.domain.interfaces.GraphRepository.structural_similarity` /
+  :meth:`core.adapters.neo4j_repo.Neo4jGraphRepo.structural_similarity`, a 5th button on
+  ``/knowledge_graph``. Real, corrected implementation: ``gds.fastRP.mutate`` writes the
+  embedding as an in-memory node property, then ``gds.knn.stream`` (not ``gds.nodeSimilarity`` --
+  see the Technique 4 correction above) computes cosine similarity over those vectors.
+  *Validated with*: a real spot-check against the live synced graph before writing any tests --
+  the top pairs found Neutral/Detached/Expressive archetypes and qwen/tinyllama models as near-
+  identical (~0.9999 similarity), the exact same grouping Stage 4's Leiden run independently
+  placed in one community, real convergent evidence between two independent methods (Technique 3's
+  triangulation argument, demonstrated concretely rather than left as a citation); the single most
+  anomalous node was the ``personalization`` bias, whose best match to anything else scored 0.0 --
+  reported as-is in the UI, not smoothed over.
 - **Stage 6 -- link prediction for untried combinations.** ``gds.beta.pipeline.linkPrediction``
   trained on already-run (archetype, bias, model) triples, evaluated on a real held-out split.
   *Validate with*: precision/recall/AUC on the held-out edges -- and, ideally, an actual follow-up

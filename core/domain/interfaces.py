@@ -314,6 +314,25 @@ class GraphRepository(Protocol):
         """
         ...
 
+    def structural_similarity(self) -> dict:
+        """
+        Structural analogy/anomaly detection (Stage 5 of
+        ``docs/source/wiki/08-graph-representation-learning.rst``) over the same FastRP embeddings
+        Stage 4 introduced -- "what is this archetype/bias/model structurally most like" and,
+        symmetrically, "what resembles nothing else in the corpus."
+
+        Returns
+        -------
+        dict
+            ``{"top_similar_pairs": list[dict], "most_anomalous": dict | None}``. Each pair is
+            ``{"node_a_type", "node_a_name", "node_b_type", "node_b_name", "similarity"}``,
+            deduplicated and ranked highest-first (a real analogy signal). ``most_anomalous`` is
+            ``{"node_type", "name", "best_similarity"}`` for the single node whose *closest* match
+            is weakest -- a real structural anomaly, not merely below some arbitrary node. ``None``
+            only if the graph has no comparable nodes at all.
+        """
+        ...
+
 
 @runtime_checkable
 class Repository(Protocol):

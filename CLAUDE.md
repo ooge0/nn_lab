@@ -238,13 +238,16 @@ Not gimmicks, not micro-optimizations — habits from people who actually unders
   under the original quarantine, unchanged: the plain Archetype/Bias co-occurrence sync, all 4
   PageRank scripts, Hypothesis Testing, Uncertainty Analysis.
 
-  **Same day, later: Stage 4 of the roadmap shipped into `GraphRepository`/`Neo4jGraphRepo`.**
+  **Same day, later: Stages 4 and 5 of the roadmap shipped into `GraphRepository`/`Neo4jGraphRepo`.**
   `behavioral_communities()` — Leiden community detection over Archetype/Bias/Model/CascadeOutcome
   (connected via a materialized `CO_OCCURS_WITH` co-occurrence edge, since they're never directly
-  connected otherwise), a 4th button on `/knowledge_graph`, reporting GDS's own modularity as the
-  real validation number. 4 new tests (15 unit total, 11 integration total). Full detail, a real
-  `gds.nodeSimilarity`/`gds.knn` correction found while implementing, and what's still open (Stages
-  5/6, the NMI cross-check against UMAP/HDBSCAN): `docs/source/wiki/08-graph-representation-learning.rst`.
+  connected otherwise); `structural_similarity()` — `gds.fastRP.mutate` + `gds.knn.stream` for
+  analogy/anomaly over the same graph, which independently agreed with Leiden's own communities on
+  real synced data. Two new buttons on `/knowledge_graph`, both reporting GDS's own real numbers
+  (modularity; similarity scores) as validation, not eyeballed results. 10 new tests total (23
+  unit, 13 integration). Full detail, a real `gds.nodeSimilarity`/`gds.knn` correction found while
+  implementing, and what's still open (Stage 6, the NMI cross-check against UMAP/HDBSCAN):
+  `docs/source/wiki/08-graph-representation-learning.rst`.
 - Authentication.
 - Hosted inference migration (stay on local Ollama for now).
 - Any product/marketing/"client-facing metrics" layer.
@@ -660,8 +663,8 @@ Stage 16 did cutover/cleanup). What's actually on disk today:
   `NaivePromptStrategy`, `rag/` (moved here from `core/rag/` in Stage 3:
   `chunking.py`, `ingestion.py`/`RAGEngine`, `retriever.py`, `vector_store.py`, `knowledge_base.py`),
   `neo4j_repo.py`/`Neo4jGraphRepo` (implements `GraphRepository`, added 2026-09-05 — the failure-mode
-  graph, promoted out of the legacy Neo4j subsystem, plus `behavioral_communities()`/Leiden
-  community detection added the same day; see §1's fourth Neo4j entry).
+  graph, promoted out of the legacy Neo4j subsystem, plus `behavioral_communities()`/Leiden and
+  `structural_similarity()`/node-similarity added the same day; see §1's fourth Neo4j entry).
 - **`core/analysis/`** — the linguistic/statistical metric implementations
   (`calculate_advanced_linguistic_metrics.py`, `nlp_science.py`, `neuro_metrics.py`,
   `model_evaluation.py`, `data_contract.py`) plus `cluster_discovery.py` (the pre-existing

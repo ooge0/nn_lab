@@ -127,6 +127,16 @@
     </button>
     <div id="kg-communities"></div>
   </fieldset>
+
+  <fieldset>
+    <legend>Structural similarity (analogy / anomaly)</legend>
+    <button type="button" hx-get="/knowledge_graph/structural_similarity" hx-target="#kg-similarity" hx-swap="innerHTML"
+            hx-indicator="#kg-similarity-spinner" hx-disabled-elt="this">
+      Run query
+      <span id="kg-similarity-spinner" class="htmx-indicator spinner" aria-hidden="true"></span>
+    </button>
+    <div id="kg-similarity"></div>
+  </fieldset>
   </main>
 </div>
 </body>

@@ -10,7 +10,12 @@ for real, driving the actual FastAPI app against a live Neo4j install (see
 ``docs/source/wiki/07-knowledge-graph-results.rst``).
 """
 
-from core.adapters.neo4j_repo import Neo4jGraphRepo, _build_failure_mode_rows, _parse_rag_chunks
+from core.adapters.neo4j_repo import (
+    Neo4jGraphRepo,
+    _build_failure_mode_rows,
+    _parse_rag_chunks,
+    _summarize_similarity_pairs,
+)
 
 
 class _FakeResult:
@@ -42,6 +47,25 @@ class _FakeGraph:
                     {"community_id": 0, "node_type": "Archetype", "name": "Detached"},
                     {"community_id": 0, "node_type": "Model", "name": "qwen:latest"},
                     {"community_id": 1, "node_type": "Archetype", "name": "Defensive"},
+                ]
+            )
+        if "gds.knn.stream" in q:
+            return _FakeResult(
+                [
+                    {
+                        "node_a_type": "Archetype",
+                        "node_a_name": "Detached",
+                        "node_b_type": "Archetype",
+                        "node_b_name": "Neutral",
+                        "similarity": 0.99,
+                    },
+                    {
+                        "node_a_type": "Bias",
+                        "node_a_name": "personalization",
+                        "node_b_type": "Archetype",
+                        "node_b_name": "Detached",
+                        "similarity": 0.0,
+                    },
                 ]
             )
         return _FakeResult()
@@ -162,6 +186,102 @@ def test_build_rows_parses_real_rag_chunks_only_when_rag_enabled():
         {"archetype": "baseline", "category": "Behavior"}
     ]
     assert _build_failure_mode_rows([without_rag], run_id="run-a")[0]["chunks"] == []
+
+
+# --- _summarize_similarity_pairs (Stage 5) ------------------------------------------------------
+
+
+def test_summarize_similarity_pairs_dedupes_directed_rows_keeping_the_max_similarity():
+    """gds.knn.stream returns each real-world pair twice (once from each node's own top-K list),
+    with slightly different scores possible -- must collapse to one row, keeping the higher score."""
+    raw = [
+        {
+            "node_a_type": "Model",
+            "node_a_name": "qwen:latest",
+            "node_b_type": "Model",
+            "node_b_name": "tinyllama:latest",
+            "similarity": 0.91,
+        },
+        {
+            "node_a_type": "Model",
+            "node_a_name": "tinyllama:latest",
+            "node_b_type": "Model",
+            "node_b_name": "qwen:latest",
+            "similarity": 0.93,
+        },
+    ]
+    result = _summarize_similarity_pairs(raw)
+    assert result["top_similar_pairs"] == [
+        {
+            "node_a_type": "Model",
+            "node_a_name": "tinyllama:latest",
+            "node_b_type": "Model",
+            "node_b_name": "qwen:latest",
+            "similarity": 0.93,
+        }
+    ]
+
+
+def test_summarize_similarity_pairs_excludes_self_pairs():
+    raw = [
+        {
+            "node_a_type": "Archetype",
+            "node_a_name": "Detached",
+            "node_b_type": "Archetype",
+            "node_b_name": "Detached",
+            "similarity": 1.0,
+        }
+    ]
+    result = _summarize_similarity_pairs(raw)
+    assert result["top_similar_pairs"] == []
+    assert result["most_anomalous"] is None
+
+
+def test_summarize_similarity_pairs_caps_at_five_sorted_descending():
+    raw = [
+        {
+            "node_a_type": "Archetype",
+            "node_a_name": f"A{i}",
+            "node_b_type": "Archetype",
+            "node_b_name": f"B{i}",
+            "similarity": i / 10,
+        }
+        for i in range(8)
+    ]
+    result = _summarize_similarity_pairs(raw)
+    scores = [p["similarity"] for p in result["top_similar_pairs"]]
+    assert len(scores) == 5
+    assert scores == sorted(scores, reverse=True)
+    assert scores[0] == 0.7
+
+
+def test_summarize_similarity_pairs_flags_the_node_whose_best_match_is_weakest_as_anomalous():
+    """Real Stage 5 finding, not invented: a node can have a merely-ordinary similarity to one
+    neighbor while its overall *best* match is still far weaker than every other node's best
+    match -- that's the real anomaly signal, not just "the lowest number that appears anywhere"."""
+    raw = [
+        {
+            "node_a_type": "Archetype",
+            "node_a_name": "Detached",
+            "node_b_type": "Archetype",
+            "node_b_name": "Neutral",
+            "similarity": 0.99,
+        },
+        {
+            "node_a_type": "Bias",
+            "node_a_name": "personalization",
+            "node_b_type": "Archetype",
+            "node_b_name": "Detached",
+            "similarity": 0.0,
+        },
+    ]
+    result = _summarize_similarity_pairs(raw)
+    assert result["most_anomalous"] == {"node_type": "Bias", "name": "personalization", "best_similarity": 0.0}
+
+
+def test_summarize_similarity_pairs_handles_empty_input():
+    result = _summarize_similarity_pairs([])
+    assert result == {"top_similar_pairs": [], "most_anomalous": None}
 
 
 # --- Neo4jGraphRepo ----------------------------------------------------------------------------
@@ -303,3 +423,64 @@ def test_behavioral_communities_still_drops_the_graph_when_leiden_itself_raises(
 
     drop_calls = [c for c in fake_graph.calls if "gds.graph.drop" in c["query"]]
     assert len(drop_calls) == 2, "the projected graph must still be dropped even when Leiden itself fails"
+
+
+# --- Neo4jGraphRepo.structural_similarity (Stage 5) ---------------------------------------------
+
+
+def test_structural_similarity_returns_the_summarized_shape():
+    fake_graph = _FakeGraph()
+    repo = Neo4jGraphRepo(graph=fake_graph)
+
+    result = repo.structural_similarity()
+
+    assert result["most_anomalous"] == {"node_type": "Bias", "name": "personalization", "best_similarity": 0.0}
+    assert result["top_similar_pairs"] == [
+        {
+            "node_a_type": "Archetype",
+            "node_a_name": "Detached",
+            "node_b_type": "Archetype",
+            "node_b_name": "Neutral",
+            "similarity": 0.99,
+        },
+        {
+            "node_a_type": "Bias",
+            "node_a_name": "personalization",
+            "node_b_type": "Archetype",
+            "node_b_name": "Detached",
+            "similarity": 0.0,
+        },
+    ]
+
+
+def test_structural_similarity_mutates_embeddings_before_running_knn():
+    fake_graph = _FakeGraph()
+    repo = Neo4jGraphRepo(graph=fake_graph)
+
+    repo.structural_similarity()
+
+    queries = [c["query"] for c in fake_graph.calls]
+    mutate_idx = next(i for i, q in enumerate(queries) if "gds.fastRP.mutate" in q)
+    knn_idx = next(i for i, q in enumerate(queries) if "gds.knn.stream" in q)
+    assert mutate_idx < knn_idx, "embeddings must be written before gds.knn can consume them"
+
+
+def test_structural_similarity_still_drops_the_graph_when_knn_itself_raises():
+    class _RaisingGraph(_FakeGraph):
+        def run(self, query, **params):
+            q = " ".join(query.split())
+            if "gds.knn.stream" in q:
+                raise RuntimeError("GDS out of memory")
+            return super().run(query, **params)
+
+    fake_graph = _RaisingGraph()
+    repo = Neo4jGraphRepo(graph=fake_graph)
+
+    try:
+        repo.structural_similarity()
+        assert False, "expected the RuntimeError to propagate"
+    except RuntimeError:
+        pass
+
+    drop_calls = [c for c in fake_graph.calls if "gds.graph.drop" in c["query"]]
+    assert len(drop_calls) == 2, "the projected graph must still be dropped even when KNN itself fails"

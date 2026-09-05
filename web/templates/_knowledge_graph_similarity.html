@@ -1,0 +1,39 @@
+{# Stage 5 of docs/source/wiki/08-graph-representation-learning.rst: analogy/anomaly detection via
+   gds.knn over the same FastRP embeddings Stage 4 introduced. Two distinct signals from one query:
+   the strongest pairs (real analogies) and the single weakest-best-match node (a real structural
+   anomaly), not just an arbitrary bottom-of-the-list entry. #}
+<h3>Structural similarity (analogy / anomaly)</h3>
+{% if top_similar_pairs %}
+<h4>Most similar pairs</h4>
+<table>
+  <thead>
+    <tr><th>A</th><th>B</th><th>Similarity</th></tr>
+  </thead>
+  <tbody>
+    {% for pair in top_similar_pairs %}
+    <tr>
+      <td>{{ pair.node_a_type }}: {{ pair.node_a_name }}</td>
+      <td>{{ pair.node_b_type }}: {{ pair.node_b_name }}</td>
+      <td class="num">{{ "%.4f"|format(pair.similarity) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if most_anomalous %}
+<h4>Most anomalous</h4>
+<table class="kv-table">
+  <tbody>
+    <tr><th>Node</th><td>{{ most_anomalous.node_type }}: {{ most_anomalous.name }}</td></tr>
+    <tr><th>Best similarity to anything else</th><td class="num">{{ "%.4f"|format(most_anomalous.best_similarity) }}</td></tr>
+  </tbody>
+</table>
+<p class="hint">
+  The node whose <em>closest</em> match is still weakest -- not merely the bottom of some ranking,
+  but structurally unlike everything else in the corpus. A low score here is a real, disclosed
+  finding, not a bug.
+</p>
+{% endif %}
+{% else %}
+<p class="hint">No results -- sync a run into the failure-mode graph first (above).</p>
+{% endif %}

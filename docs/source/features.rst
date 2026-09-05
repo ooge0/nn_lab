@@ -1036,6 +1036,13 @@ query for in advance, unlike the 3 root-cause queries above. Reports GDS's own m
 alongside the results (real validation, not an eyeballed result) -- including honestly when that
 number is unflattering.
 
+A 5th query, same day: **Structural similarity (analogy / anomaly)** -- Stage 5 of the same roadmap.
+Runs ``gds.fastRP.mutate`` + ``gds.knn.stream`` over the same co-occurrence graph to find the
+strongest node-to-node analogies and the single most structurally anomalous node (the one whose
+*closest* match is still weakest). On real synced data, this independently agreed with Stage 4's
+Leiden communities -- two different algorithms landing on the same grouping, real convergent
+evidence rather than a coincidence of one method.
+
 Not yet built
 ----------------
 

@@ -7,10 +7,10 @@ a real page + real endpoints -- promoted 2026-09-05 from the legacy Neo4j subsys
 (``core/tabs/knowledge_graph.py``) into the layered architecture, by explicit author decision (see
 :class:`core.domain.interfaces.GraphRepository`'s own docstring for the exact scope of that
 decision). This covers only the failure-mode graph, its 3 root-cause queries, and (2026-09-05,
-later the same day) Stage 4 of ``docs/source/wiki/08-graph-representation-learning.rst`` (Leiden
-community detection) -- the original Archetype/Bias co-occurrence graph and the PageRank scripts
-remain on the existing Streamlit entry point (``run_knowledge_graph.py``), untouched, per CLAUDE.md
-SS1.
+later the same day) Stages 4/5 of ``docs/source/wiki/08-graph-representation-learning.rst`` (Leiden
+community detection, node-similarity analogy/anomaly) -- the original Archetype/Bias co-occurrence
+graph and the PageRank scripts remain on the existing Streamlit entry point
+(``run_knowledge_graph.py``), untouched, per CLAUDE.md SS1.
 
 Every endpoint here degrades to a clear inline error rather than a raw 500 when Neo4j isn't
 reachable -- this app's other pages don't depend on Neo4j at all, and this one shouldn't take the
@@ -132,6 +132,20 @@ def behavioral_communities(request: Request) -> HTMLResponse:
         return templates.TemplateResponse(request, "_knowledge_graph_communities.html", result)
     except Exception as exc:
         logger.error(f"behavioral_communities query failed: {exc}")
+        return templates.TemplateResponse(
+            request, "_knowledge_graph_status.html", {"error": f"Error running query: {exc}"}
+        )
+
+
+@router.get("/structural_similarity", response_class=HTMLResponse)
+def structural_similarity(request: Request) -> HTMLResponse:
+    """Stage 5 (docs/source/wiki/08-graph-representation-learning.rst): analogy/anomaly detection
+    via gds.knn over the same FastRP embeddings Stage 4 introduced."""
+    try:
+        result = _graph_repo.structural_similarity()
+        return templates.TemplateResponse(request, "_knowledge_graph_similarity.html", result)
+    except Exception as exc:
+        logger.error(f"structural_similarity query failed: {exc}")
         return templates.TemplateResponse(
             request, "_knowledge_graph_status.html", {"error": f"Error running query: {exc}"}
         )

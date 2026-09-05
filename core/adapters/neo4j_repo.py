@@ -25,6 +25,7 @@ legacy one its one covered capability was promoted out of.
 2026-09-05, later the same day: :meth:`Neo4jGraphRepo.behavioral_communities` adds Stage 4 of
 ``docs/source/wiki/08-graph-representation-learning.rst`` -- the first design-doc technique to
 graduate into real code, exactly the growth room the promotion above was for.
+:meth:`Neo4jGraphRepo.structural_similarity` adds Stage 5 the same way.
 """
 
 import configparser
@@ -193,6 +194,79 @@ _LEIDEN_STREAM_CYPHER = """
     ORDER BY community_id, node_type, name
 """
 
+# Stage 5 of docs/source/wiki/08-graph-representation-learning.rst: analogy/anomaly via node
+# similarity over the FastRP embeddings. gds.fastRP.mutate (not .stream) writes the embedding as an
+# in-memory node property GDS can consume; gds.knn.stream is the real procedure for embedding-vector
+# similarity (gds.nodeSimilarity is topological Jaccard/overlap and does not take a vector property
+# at all -- a real correction, see the wiki page's own "found while implementing" note).
+_FASTRP_MUTATE_CYPHER = """
+    CALL gds.fastRP.mutate(
+        $graph_name,
+        {embeddingDimension: 64, relationshipWeightProperty: 'weight', mutateProperty: 'embedding'}
+    )
+"""
+_KNN_STREAM_CYPHER = """
+    CALL gds.knn.stream($graph_name, {nodeProperties: ['embedding'], topK: 3})
+    YIELD node1, node2, similarity
+    WITH gds.util.asNode(node1) AS a, gds.util.asNode(node2) AS b, similarity
+    RETURN
+        labels(a)[0] AS node_a_type,
+        CASE WHEN labels(a)[0] = 'CascadeOutcome' THEN a.stage + ':' + a.result ELSE a.name END AS node_a_name,
+        labels(b)[0] AS node_b_type,
+        CASE WHEN labels(b)[0] = 'CascadeOutcome' THEN b.stage + ':' + b.result ELSE b.name END AS node_b_name,
+        similarity
+    ORDER BY similarity DESC
+"""
+
+
+def _summarize_similarity_pairs(raw_pairs: list[dict]) -> dict:
+    """Reduces ``gds.knn.stream``'s raw per-node top-K neighbor rows (directed -- a node's own
+    neighbor list, so the same real-world pair can appear as both (a, b) and (b, a), and every node
+    appears as the source of its own K rows) into the two things Stage 5's validation step actually
+    asks for: a deduplicated ranking of the strongest pairs (real analogies), and the single node
+    whose *best* match is weakest (a real structural anomaly -- resembles nothing else in the corpus
+    more than a little, not just less than some arbitrary node).
+
+    Parameters
+    ----------
+    raw_pairs : list[dict]
+        ``{"node_a_type", "node_a_name", "node_b_type", "node_b_name", "similarity"}`` rows, as
+        returned by ``_KNN_STREAM_CYPHER``.
+
+    Returns
+    -------
+    dict
+        ``{"top_similar_pairs": list[dict], "most_anomalous": dict | None}``.
+    """
+    best_similarity: dict[tuple[str, str], float] = {}
+    deduped: dict[frozenset, dict] = {}
+    for row in raw_pairs:
+        a_key = (row["node_a_type"], row["node_a_name"])
+        b_key = (row["node_b_type"], row["node_b_name"])
+        if a_key == b_key:
+            continue
+        sim = row["similarity"]
+        best_similarity[a_key] = max(best_similarity.get(a_key, -1.0), sim)
+        best_similarity[b_key] = max(best_similarity.get(b_key, -1.0), sim)
+        pair_key = frozenset((a_key, b_key))
+        if pair_key not in deduped or sim > deduped[pair_key]["similarity"]:
+            deduped[pair_key] = {
+                "node_a_type": a_key[0],
+                "node_a_name": a_key[1],
+                "node_b_type": b_key[0],
+                "node_b_name": b_key[1],
+                "similarity": sim,
+            }
+
+    top_similar_pairs = sorted(deduped.values(), key=lambda r: r["similarity"], reverse=True)[:5]
+
+    most_anomalous = None
+    if best_similarity:
+        (anomaly_type, anomaly_name), anomaly_score = min(best_similarity.items(), key=lambda kv: kv[1])
+        most_anomalous = {"node_type": anomaly_type, "name": anomaly_name, "best_similarity": anomaly_score}
+
+    return {"top_similar_pairs": top_similar_pairs, "most_anomalous": most_anomalous}
+
 
 def _parse_rag_chunks(rag_context: Optional[str]) -> list[dict]:
     """Recovers structured (archetype, category) chunk provenance from the concatenated
@@ -328,3 +402,16 @@ class Neo4jGraphRepo:
             "community_count": stats["community_count"],
             "rows": rows,
         }
+
+    def structural_similarity(self) -> dict:
+        """See :meth:`core.domain.interfaces.GraphRepository.structural_similarity`."""
+        graph = self._get_graph()
+        graph.run(_MATERIALIZE_COOCCURRENCE_CYPHER)
+        graph.run(_DROP_GRAPH_IF_EXISTS_CYPHER, graph_name=_GRAPH_NAME)
+        graph.run(_PROJECT_GRAPH_CYPHER, graph_name=_GRAPH_NAME)
+        try:
+            graph.run(_FASTRP_MUTATE_CYPHER, graph_name=_GRAPH_NAME)
+            raw_pairs = graph.run(_KNN_STREAM_CYPHER, graph_name=_GRAPH_NAME).data()
+        finally:
+            graph.run(_DROP_GRAPH_IF_EXISTS_CYPHER, graph_name=_GRAPH_NAME)
+        return _summarize_similarity_pairs(raw_pairs)

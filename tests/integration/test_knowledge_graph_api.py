@@ -38,6 +38,18 @@ class _FakeGraphRepo:
                 {"community_id": 1, "node_type": "Archetype", "name": "Defensive"},
             ],
         }
+        self.structural_similarity_result = {
+            "top_similar_pairs": [
+                {
+                    "node_a_type": "Archetype",
+                    "node_a_name": "Detached",
+                    "node_b_type": "Archetype",
+                    "node_b_name": "Neutral",
+                    "similarity": 0.9999,
+                }
+            ],
+            "most_anomalous": {"node_type": "Bias", "name": "personalization", "best_similarity": 0.0},
+        }
         self.raise_on_query = False
 
     def sync_failure_mode_graph(self, run_id, responses):
@@ -65,6 +77,11 @@ class _FakeGraphRepo:
         if self.raise_on_query:
             raise RuntimeError("Cannot open connection to bolt://localhost:7687")
         return self.behavioral_communities_result
+
+    def structural_similarity(self):
+        if self.raise_on_query:
+            raise RuntimeError("Cannot open connection to bolt://localhost:7687")
+        return self.structural_similarity_result
 
 
 def _make_run(run_id, started_at, total_tasks=2):
@@ -182,5 +199,20 @@ def test_behavioral_communities_renders_modularity_and_the_community_rows(client
 def test_behavioral_communities_when_neo4j_is_unreachable_shows_a_clear_error_not_a_500(client, fake_graph_repo):
     fake_graph_repo.raise_on_query = True
     response = client.get("/knowledge_graph/behavioral_communities")
+    assert response.status_code == 200
+    assert "Error running query" in response.text
+
+
+def test_structural_similarity_renders_the_top_pairs_and_the_anomaly(client):
+    response = client.get("/knowledge_graph/structural_similarity")
+    assert response.status_code == 200
+    assert "Detached" in response.text and "Neutral" in response.text
+    assert "personalization" in response.text
+    assert "0.0000" in response.text
+
+
+def test_structural_similarity_when_neo4j_is_unreachable_shows_a_clear_error_not_a_500(client, fake_graph_repo):
+    fake_graph_repo.raise_on_query = True
+    response = client.get("/knowledge_graph/structural_similarity")
     assert response.status_code == 200
     assert "Error running query" in response.text
