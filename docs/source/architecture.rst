@@ -191,21 +191,24 @@ Write path -- per-response cascade (CLAUDE.md SS3a)
      :extract_best_text;
      :Layer 0 -- classify_response\n(VALID / EMPTY / MALFORMED_JSON /\nTRUNCATED / SCHEMA_ERROR);
      if (Layer 0: VALID?) then (no)
-       :minimal entry\n(metrics + judge both skipped);
+       :minimal entry\n(metrics, Layer 1/2, and judge all skipped);
      else (yes)
        :PsychScientist / NeuroMetrics /\ncalculate_advanced_linguistic_metrics\n(incl. Layer 1's semantic_overlap);
-       if (Layer 1 -- is_echo_response\n(semantic_overlap > 0.5)?) then (yes, echo)
+       :Layer 1 -- is_echo_response\n(semantic_overlap > 0.5)?;
+       note right: Threshold is inverted from standard STS\nintuition -- rejects HIGH similarity to the\nbias label (echoed instruction), not low.\nCalibrated against real generated data,\nnot assumed. See wiki/04-llm-analytics.
+       :Layer 2 -- check_hallucination\n(NLI cross-encoder vs. rag_context);
+       note right: Runs regardless of the Layer 1 result above --\nonly meaningful (and only run) when RAG is\nenabled; logs a real contradiction score/label\nbut never gates v_ok (CLAUDE.md SS4, 2026-08-24).\nAn echo-rejected response can still show\nlayer2_checked=true.
+       if (Layer 1: echo detected?) then (yes, echo)
          :synthesize rejection JudgeVerdict\n(real judge call skipped);
-         note right: Threshold is inverted from standard STS\nintuition -- rejects HIGH similarity to the\nbias label (echoed instruction), not low.\nCalibrated against real generated data,\nnot assumed. See wiki/04-llm-analytics.
        else (no, genuine)
          :Judge.evaluate (StructuredJudge);
        endif
      endif
-     :entry dict assembled (66+ fields, incl.\nlayer0_classification / layer1_echo_detected);
+     :entry dict assembled (70+ fields, incl.\nlayer0_classification / layer1_echo_detected /\nlayer2_checked / layer2_predicted_label);
      :Repository.save_response;
      :progress event -> SSE queue / CLI stdout;
    }
-   note right: Layer 2 (NLI/sentiment/toxicity classifiers, CLAUDE.md SS3a)\nremains unbuilt -- the one cascade layer still\nreserved for the author to hand-write (CLAUDE.md SS6).
+   note right: Layer 2 is logging-only, not a gate -- no real-data\ncalibration for a rejection threshold exists yet\n(the same discipline that caught Layer 1's own\nthreshold needing to be inverted). Sentiment/toxicity\nclassifiers (CLAUDE.md SS3a's other Layer 2 half)\nremain entirely unbuilt.
 
    :Run complete -> "done" event;
    stop
@@ -351,7 +354,10 @@ overview, complementing the component/class/ER diagrams above (which answer "how
 traced directly against ``web/templates/_nav.html`` and each router, not invented for the
 diagram. Colors group the same three CLAUDE.md SS3a/SS3b-derived categories the sidebar itself uses
 (``[req]``/``[corpus]``/``[sys]``), plus a fourth for the per-response cascade specifically, since
-it's a cross-cutting concept, not one page.
+it's a cross-cutting concept, not one page. Updated 2026-09-05 with a fifth branch for the separate
+Neo4j knowledge-graph entry point (``run_knowledge_graph.py``, its own standalone Streamlit process,
+not reachable from ``_nav.html`` at all) -- omitted until now, which meant this "what can I do here"
+map was silently incomplete for anyone who didn't already know that page existed.
 
 .. uml::
 
@@ -398,6 +404,17 @@ it's a cross-cutting concept, not one page.
    **[#6b6b6b] Service status
    ***[#6b6b6b] Ollama / NLTK / spaCy
    **[#6b6b6b] FAQ /faq
+   right side
+   **[#b5651d] Knowledge Graph (Neo4j, separate script)
+   ***[#b5651d] streamlit run run_knowledge_graph.py
+   ***[#b5651d] Sync history to Neo4j\n(Archetype<->Bias co-occurrence)
+   ***[#b5651d] PageRank-1..4 (GDS)
+   ***[#b5651d] Root Cause (Failure-Mode Graph)
+   ****[#b5651d] Sync failure-mode graph\n(cascade lineage, RAG provenance)
+   ****[#b5651d] Echo-rejections by model
+   ****[#b5651d] Terminal cascade stage by archetype
+   ****[#b5651d] RAG chunk categories vs. echo
+   ***[#b5651d] Hypothesis Testing / Uncertainty Analysis\n(pandas/scipy, no graph queries)
    @endmindmap
 
 Tag cloud
@@ -468,15 +485,22 @@ in the corpus-level confirmatory-analysis stage (CLAUDE.md SS3b).
    stop
    @enduml
 
-Neo4j knowledge-graph flow (untouched legacy, CLAUDE.md SS1)
--------------------------------------------------------------------
+Neo4j knowledge-graph flow (legacy, CLAUDE.md SS1 -- two narrow, explicit, dated exceptions)
+-------------------------------------------------------------------------------------------------
 
-Included for completeness, not as part of the layered rewrite -- this traces
-``run_knowledge_graph.py`` -> :class:`~core.tabs.knowledge_graph.KnowledgeGraph`, exactly as they
-exist on disk today. Per CLAUDE.md SS1 this subsystem is locked: no logic here has been touched,
-adapted, or re-layered -- this diagram documents existing, unchanged behavior (the one standing
-exception CLAUDE.md SS1 already carves out for "docstring/comment clarifications that add
-historical or architectural context without changing behavior").
+Not part of the layered rewrite, and CLAUDE.md SS1's quarantine (no refactor, no re-layering behind
+a ``core.domain`` interface, no promotion into this project's testing/architecture discipline)
+stands unchanged. But this subsystem is **not entirely untouched** as of 2026-09-05 -- two narrow,
+explicit, author-requested exceptions landed, same precedent as the earlier judge-fix exception
+(CLAUDE.md SS4/SS6): (1) a real, disclosed GDS configuration bug (not a code bug -- ``neo4j.conf``
+never unrestricted/allowlisted ``gds.*``, even though the plugin was installed) was found and fixed,
+verified live; and (2) a second, additive sync + 3 root-cause queries were added, modeling the
+actual per-response cascade as an explicit lineage graph. Full record, real captured proof
+(screenshots, real query output), and the exact scope of what changed vs. what stayed untouched:
+:doc:`wiki/07-knowledge-graph-results`.
+
+Original sync + PageRank flow (scripts 1-3 untouched; script 4 got a real bug fix)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. uml::
 
@@ -491,7 +515,7 @@ historical or architectural context without changing behavior").
    start
    :run_knowledge_graph.py\n(standalone Streamlit entry point);
    :JSONLStore.load_responses(run_id)\n(same Repository the FastAPI app/CLI write to);
-   :pandas DataFrame;
+   :pandas DataFrame (+ run_id column,\nadded 2026-09-05 -- needed by the\nfailure-mode graph below);
    :KnowledgeGraph.knowledge_graph_tab(df);
 
    partition "Neo4jService (py2neo)" {
@@ -503,12 +527,75 @@ historical or architectural context without changing behavior").
      :UNWIND $rows AS row\nMERGE (a:Archetype) MERGE (b:Bias)\nMERGE (a)-[:ASSOCIATED_WITH]->(b);
    endif
 
-   partition "PageRank scripts (GDS)" {
+   partition "PageRank scripts 1-4 (GDS)" {
      :CALL gds.graph.project\n(archetypeGraph / experimentGraph);
      :CALL gds.pageRank.stream;
-     note right: Script-3's graph projection has a real,\ndisclosed unresolved bug -- "no procedure\ngds.graph.exists" on some GDS deployments.\nNot fixed here (CLAUDE.md SS1 scope).
+     note right: Fixed 2026-09-05, verified live: the plugin was\ninstalled but neo4j.conf never unrestricted/\nallowlisted gds.* -- a config gap, not a missing\ndependency. Script-4 also had a real code bug\n(no exists-check/projection guard, unlike 1/3) --\nfixed to match their pattern. See wiki/07 for the\nreal PageRank output captured after the fix.
    }
 
    :Streamlit bar chart / table\n(rendered in-process, not via the FastAPI app);
    stop
+   @enduml
+
+Failure-mode / cascade-lineage graph (new, additive, 2026-09-05)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A second sync, a new "Root Cause (Failure-Mode Graph)" tab -- does not touch or replace the
+Archetype/Bias/PageRank graph above. Models the actual per-response cascade (the same write-path
+activity diagram earlier on this page) as explicit lineage edges, so a failure becomes a graph
+traversal instead of a correlation you already have to suspect. Schema and real, captured query
+results (a real 500-response run: 27 vs. 12 echo-rejections by model; one RAG knowledge category
+linked to 36 of the run's echo failures): :doc:`wiki/07-knowledge-graph-results`.
+
+.. uml::
+
+   @startuml
+   skinparam backgroundColor transparent
+   skinparam shadowing false
+
+   entity "Response" as RESP {
+     * response_id : str <<PK, = run_id + ":" + step>>
+     --
+     word_count, duration_ms
+   }
+   entity "Run" as RUN {
+     * run_id : str <<PK>>
+   }
+   entity "Archetype" as ARCH {
+     * name : str <<PK>>
+   }
+   entity "Bias" as BIAS {
+     * name : str <<PK>>
+   }
+   entity "Model" as MODEL {
+     * name : str <<PK>>
+   }
+   entity "CascadeOutcome" as OUTCOME {
+     * stage : str
+     * result : str
+     --
+     .. small, fixed dictionary -- reused by
+     .. every response that reaches it, not
+     .. one node per response
+   }
+   entity "CascadeStage" as STAGE {
+     * name : str <<PK, one of Layer0/1/2/Judge>>
+   }
+   entity "KnowledgeChunk" as CHUNK {
+     * archetype : str
+     * category : str
+     --
+     .. RAG provenance, recovered by parsing
+     .. the persisted rag_context string
+   }
+
+   RESP }o--|| RUN : IN_RUN
+   RESP }o--|| ARCH : CONDITIONED_ON
+   RESP }o--|| BIAS : CONDITIONED_ON
+   RESP }o--|| MODEL : GENERATED_BY
+   RESP }o--o{ MODEL : "JUDGED_BY (same node as\nGENERATED_BY in self-critic mode)"
+   RESP }o--o{ OUTCOME : "REACHED {score, confidence}\n(one edge per stage reached --\na Layer-0-rejected response has exactly one)"
+   RESP }o--o{ CHUNK : "RETRIEVED\n(only when RAG enabled)"
+   OUTCOME }o--|| STAGE : PART_OF
+   STAGE ||--o{ STAGE : "PRECEDES (fixed pipeline\norder, used by the terminal-stage\nroot-cause query)"
    @enduml

@@ -1,20 +1,53 @@
+``tests/e2e/test_db_export_e2e.py`` (2 tests)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Playwright E2E test for ``/db_export``'s "Export status" column --
+specifically the htmx out-of-band (``hx-swap-oob``) update after a successful
+export.
+
+Why this needs a real browser and not ``TestClient``: the original bug (found
+by the author from a real screenshot, not hypothetical) was a bare ``<td hx-
+swap-oob="true">`` in the AJAX response -- valid as a string of HTML, but a
+``<td>`` at the top level of a fragment (outside any ``<table>``/``<tr>``
+context) gets mangled by the *browser's own* HTML table-parsing rules, so the
+out-of-band swap silently failed to replace the existing cell content -- the
+old "Not synced" badge and the new timestamp ended up stacked instead of one
+replacing the other, until a full page reload re-parsed everything correctly.
+``TestClient``-based integration tests (``test_db_export_api.py``) only ever
+assert against the raw HTTP response text and structurally cannot catch this
+class of bug -- they were green even with the broken ``<td>`` version, since
+the OOB element's id/attributes were present in the string either way. Only a
+real browser DOM, inspected after real parsing, proves the swap actually
+replaced the cell rather than appending to it.
+
+.. list-table::
+   :widths: 45 55
+   :header-rows: 1
+
+   * - Test
+     - Description
+   * - ``test_export_status_cell_shows_only_the_new_timestamp_not_stacked_with_not_synced[chromium]``
+     - Regression test for the exact bug reported: after clicking "Send to DB", the "Export status" cell must show only the fresh timestamp -- not "Not synced" and the timestamp both visible at once, which is what a mis-parsed out-of-band <td> swap produces.
+   * - ``test_reexport_updates_the_sync_status_cell_to_the_new_timestamp_not_the_old_one[chromium]``
+     - Regression test for the author's follow-up report: re-exporting an already-exported run (the "Re-export (overwrite)" button, a *different* element than the original "Send to DB" button, with its own hx-post/hx-target) must update the "Export status" cell to the new timestamp, not leave the old one in place or stack both.
+
 ``tests/e2e/test_experiments_e2e.py`` (13 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Playwright E2E tests for ``/experiments`` -- the first real browser-driven
 layer this project has (CLAUDE.md SS7 names Playwright as a target layer;
-before this file, zero infra existed anywhere in the repo -- see
-:doc:`qa`'s former R37 gap). Scoped deliberately to what a real browser is
-*required* for: the client-side JS added alongside this file (conditional
-field enabling/disabling, dynamic sweep-parameter bounds, tab switching) is
-invisible to ``TestClient``, which never executes JavaScript at all --
-every other test in this suite that touches ``/experiments`` tests the
-server side, not this.
+before this file, zero infra existed anywhere in the repo -- see :doc:`qa`'s
+former R37 gap). Scoped deliberately to what a real browser is *required* for:
+the client-side JS added alongside this file (conditional field
+enabling/disabling, dynamic sweep-parameter bounds, tab switching) is
+invisible to ``TestClient``, which never executes JavaScript at all -- every
+other test in this suite that touches ``/experiments`` tests the server side,
+not this.
 
 No real Ollama call happens anywhere here -- these tests exercise form
-*behavior* (what becomes enabled/disabled/validated as fields change), not
-a live generation run, so they're fast and don't depend on a local model
-being pulled.
+*behavior* (what becomes enabled/disabled/validated as fields change), not a
+live generation run, so they're fast and don't depend on a local model being
+pulled.
 
 .. list-table::
    :widths: 45 55
@@ -49,14 +82,43 @@ being pulled.
    * - ``test_sweep_min_max_bounds_are_real_per_parameter_not_a_fixed_fake_range[chromium-Presence penalty--2-2]``
      - Regression test: the explicit min/max fields' own min/max *attributes* (the browser-enforced bounds) must match the selected parameter's real valid range -- e.g. Top P must be bounded to [0, 1], not left at Temperature's [0, 2] regardless of which parameter is actually being swept, which would let an unskilled user submit a nonsensical value.
 
-``tests/integration/test_analytics_api.py`` (7 tests)
+``tests/e2e/test_tabs_chart_resize_e2e.py`` (1 test)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Playwright E2E test for the tabbed-page Plotly-width bug: a chart rendered
+inside a hidden (``display: none``) ``.tab-panel`` gets measured by Plotly at
+zero/collapsed width the moment its ``Plotly.newPlot()`` call runs (before
+``tabs.js`` has applied ``.active`` to make the panel visible), and never
+recovers until something fires a real browser ``resize`` event -- reported by
+the author from a real screenshot: charts rendered narrower than their
+container, fixed only by nudging the browser's zoom level. Server-rendered
+``TestClient`` assertions cannot see this (the HTML string is identical either
+way; only real browser layout geometry shows the collapsed width), so this
+needs a real browser, same as the ``/db_export`` OOB-swap bug in
+:mod:`tests.e2e.test_db_export_e2e`.
+
+Uses a real run already on disk (created by the author, not this suite) if one
+exists with a useful response count; skipped otherwise rather than fabricating
+one, since NLP charts need a real multi-response run to render meaningfully.
+See ``tests/e2e/conftest.py`` for ``live_server``/``page``.
+
+.. list-table::
+   :widths: 45 55
+   :header-rows: 1
+
+   * - Test
+     - Description
+   * - ``test_charts_in_the_default_and_a_switched_tab_both_render_at_full_container_width[chromium]``
+     - Regression test for the reported bug: fixed by tabs.js explicitly calling Plotly.Plots.resize() on a panel's charts the moment that panel becomes .active, both on initial load (the default tab) and on every later click (a previously-hidden tab).
+
+``tests/integration/test_analytics_api.py`` (8 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Functional API tests for the Stage 8 read-side endpoints
 (:mod:`api.routers.analytics`) -- through the real FastAPI app, with
-``analytics._repository`` swapped for a fake so no real disk data is
-required and no real Plotly-heavy computation is skipped (the charts are
-built for real against fixture data, just not against a live-Ollama run).
+``analytics._repository`` swapped for a fake so no real disk data is required
+and no real Plotly-heavy computation is skipped (the charts are built for real
+against fixture data, just not against a live-Ollama run).
 
 .. list-table::
    :widths: 45 55
@@ -74,19 +136,40 @@ built for real against fixture data, just not against a live-Ollama run).
      - GET /analytics/charts?run_id=... for a run with no persisted responses returns 404, matching /runs/summary's convention.
    * - ``test_analytics_charts_does_not_500_on_a_sparse_pre_stage6_run``
      - Regression test for a real bug found on real disk data: an early (pre-Stage-6) export with only student/archetype/bias/duration_ms/output -- no teacher, no val, no metrics at all -- crashed the adherence sub-tab with a 500 because several charts assumed columns that simply weren't there. Must degrade gracefully instead (200, whatever charts the available columns support).
+   * - ``test_analytics_charts_does_not_500_when_some_but_not_all_responses_lack_word_count``
+     - Regression test for a real bug reproduced against a real 500-response live run: a Layer-0- rejected response (e.g. TRUNCATED) never gets word_count computed at all (ExperimentRunner._run_one skips metrics computation for it), so a run with even one such response alongside normal ones has a real, present-but-partially-NaN word_count column once loaded into a DataFrame. _add_if_present's column-existence check doesn't catch this -- most charts tolerate a NaN value, but the "Psycholinguistic signature" scatter uses word_count as Plotly marker `size`, whose validator rejects NaN outright and crashed the whole page with a real 500 (confirmed via a direct reproduction against live disk data, not assumed).
    * - ``test_analytics_charts_skips_high_dim_and_zipf_gracefully_when_columns_missing``
      - A run whose responses lack the high-dim/zipf columns renders the adherence charts but shows the graceful skip message for the others, not a 500.
    * - ``test_analytics_charts_include_prompt_strategy_charts_when_strategy_and_coherence_present``
      - Added 2026-08-24: 'strategy' was persisted on every response but never used as a chart grouping dimension anywhere -- these two charts answer 'does prompt structure affect stability.'
+
+``tests/integration/test_api_status_api.py`` (3 tests)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Functional API tests for :mod:`api.routers.api_status` -- through the real
+FastAPI app (no fakes swapped in for the routers it checks, since the whole
+point is verifying it exercises the *real* app, the same way a browser would).
+
+.. list-table::
+   :widths: 45 55
+   :header-rows: 1
+
+   * - Test
+     - Description
+   * - ``test_api_status_page_returns_200_and_reports_all_frontend_pages_checked``
+     - Description is missing
+   * - ``test_api_status_page_never_fires_side_effecting_or_streaming_routes``
+     - The 'Not fired' section lists these routes by name -- confirms they're documented as skipped, not silently omitted or (worse) actually called.
+   * - ``test_api_status_page_skips_run_id_routes_gracefully_when_no_runs_exist``
+     - With zero runs in the live JSONLStore directory, run_id-needing backend routes must report a clear skip, not a 500 or a fabricated run_id.
 
 ``tests/integration/test_benchmark_api.py`` (4 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Functional API tests for the Stage 12 read-side endpoints
 (:mod:`api.routers.benchmark`) -- through the real FastAPI app, with
-``benchmark._repository`` swapped for a fake so no real disk data is
-required. Charts/aggregation are built for real against fixture data, not
-mocked out.
+``benchmark._repository`` swapped for a fake so no real disk data is required.
+Charts/aggregation are built for real against fixture data, not mocked out.
 
 .. list-table::
    :widths: 45 55
@@ -108,12 +191,11 @@ mocked out.
 
 Functional API tests for the Stage 10 read-side endpoints
 (:mod:`api.routers.clusters`) -- through the real FastAPI app, with
-``clusters._repository`` swapped for a fake so no real disk data is
-required. Kept to a small number of full-clustering tests deliberately --
-UMAP/HDBSCAN fitting takes real seconds even on synthetic data, and the
-computation itself is already thoroughly covered by
-``tests/unit/test_cluster_discovery.py``'s unit tests. These tests confirm
-routing/wiring, not re-verify the algorithms.
+``clusters._repository`` swapped for a fake so no real disk data is required.
+Kept to a small number of full-clustering tests deliberately -- UMAP/HDBSCAN
+fitting takes real seconds even on synthetic data, and the computation itself
+is already thoroughly covered by ``tests/unit/test_cluster_discovery.py``'s
+unit tests. These tests confirm routing/wiring, not re-verify the algorithms.
 
 .. list-table::
    :widths: 45 55
@@ -130,13 +212,55 @@ routing/wiring, not re-verify the algorithms.
    * - ``test_clusters_page_renders_all_three_subtabs_for_a_populated_run``
      - GET /clusters with enough real data renders K-Means, HDBSCAN, and Behavioral topology charts -- the one full end-to-end run through the whole pipeline.
 
+``tests/integration/test_db_export_api.py`` (12 tests)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Functional API tests for :mod:`api.routers.db_export` -- through the real
+FastAPI app, with ``db_export._repository`` swapped for a fake so no real disk
+data is required. The target side is a real temp-file SQLite database (see
+:mod:`tests.unit.test_db_export`'s docstring for why ``:memory:`` can't
+exercise the overwrite/collision path) -- ``core.services.db_export`` itself
+constructs its own ``SQLiteRepo``, so the test points it at a temp path via
+monkeypatching the default rather than mocking SQLite out entirely.
+
+.. list-table::
+   :widths: 45 55
+   :header-rows: 1
+
+   * - Test
+     - Description
+   * - ``test_db_export_page_with_no_runs_shows_empty_state``
+     - Description is missing
+   * - ``test_db_export_page_lists_runs_with_a_send_to_db_button``
+     - Description is missing
+   * - ``test_db_export_page_has_bulk_select_checkboxes_wired_to_each_rows_own_button``
+     - Bulk export deliberately has no separate backend endpoint -- the 'Send selected to DB' button just triggers each checked row's own existing button (htmx.trigger), so per-row conflict resolution stays identical to a manual single click. Confirms the wiring is present: a select-all checkbox, one checkbox per row carrying its row index, and each row's action button having the matching id the bulk-trigger JS looks up.
+   * - ``test_export_run_copies_responses_and_reports_success``
+     - Description is missing
+   * - ``test_export_run_for_unknown_run_shows_a_clear_error_not_a_500``
+     - Description is missing
+   * - ``test_export_run_twice_without_overwrite_shows_already_exported_with_a_reexport_action``
+     - Description is missing
+   * - ``test_export_run_with_overwrite_true_replaces_rather_than_erroring``
+     - Description is missing
+   * - ``test_export_failure_for_one_run_does_not_report_success_for_a_different_run``
+     - Two runs visible on the same /db_export page each get their own status fragment (id="db-export-result-{run_id}") so htmx swaps the right row -- confirms a failed export for one run's response fragment never mentions the other run's id or a stray success badge, which would indicate the two rows' results got crossed.
+   * - ``test_db_export_page_shows_not_synced_for_a_run_never_exported``
+     - Description is missing
+   * - ``test_db_export_page_shows_the_real_synced_timestamp_after_an_export``
+     - Export a run, then reload the page (a fresh GET, simulating a browser refresh) -- the 'Export status' column must show a real timestamp, not 'Not synced', once the run is actually in the database.
+   * - ``test_export_run_response_includes_an_out_of_band_update_for_the_sync_status_cell``
+     - A successful export's response fragment carries an hx-swap-oob element updating the 'Export status' cell in place, so the new timestamp appears without a page reload.
+   * - ``test_export_run_that_fails_does_not_include_a_sync_status_oob_update``
+     - Nothing actually changed in the database on a failed export -- the OOB fragment (and its 'Not synced'-vs-timestamp decision) should not be emitted at all, not emitted with a stale or fabricated value.
+
 ``tests/integration/test_demo_api.py`` (4 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Functional API tests for the Stage 1 SSE + background-thread demo
-(:mod:`api.routers.demo`) -- proving the mechanism end-to-end through the
-real FastAPI app, not just its isolated helper (see
-``test_demo_queue_bridge.py`` for that).
+(:mod:`api.routers.demo`) -- proving the mechanism end-to-end through the real
+FastAPI app, not just its isolated helper (see ``test_demo_queue_bridge.py``
+for that).
 
 .. list-table::
    :widths: 45 55
@@ -158,8 +282,8 @@ real FastAPI app, not just its isolated helper (see
 
 Functional API tests for the Stage 6 experiment endpoints
 (:mod:`api.routers.experiments`) -- through the real FastAPI app, with
-``experiments._runner`` swapped for a fake-backed ``ExperimentRunner`` so
-no real Ollama call or disk write happens.
+``experiments._runner`` swapped for a fake-backed ``ExperimentRunner`` so no
+real Ollama call or disk write happens.
 
 .. list-table::
    :widths: 45 55
@@ -217,8 +341,8 @@ no real Ollama call or disk write happens.
 
 Functional API tests for the Stage 14 ``/faq`` endpoint
 (:mod:`api.routers.faq`) -- through the real FastAPI app, against the real
-``faq_eng.md``/``faq_ua.md`` files on disk (no fakes -- there's no
-persisted-run data involved in this tab at all).
+``faq_eng.md``/``faq_ua.md`` files on disk (no fakes -- there's no persisted-
+run data involved in this tab at all).
 
 .. list-table::
    :widths: 45 55
@@ -240,9 +364,9 @@ persisted-run data involved in this tab at all).
 
 Functional API tests for the Stage 11 read-side endpoints
 (:mod:`api.routers.model_evo`) -- through the real FastAPI app, with
-``model_evo._repository`` swapped for a fake so no real disk data is
-required. :class:`~core.analysis.model_evaluation.ModelEvaluation` runs
-for real against synthetic fixture data, not mocked out.
+``model_evo._repository`` swapped for a fake so no real disk data is required.
+:class:`~core.analysis.model_evaluation.ModelEvaluation` runs for real against
+synthetic fixture data, not mocked out.
 
 .. list-table::
    :widths: 45 55
@@ -270,8 +394,7 @@ for real against synthetic fixture data, not mocked out.
 
 Functional API tests for the Stage 13 read-side endpoint
 (:mod:`api.routers.monitor`) -- through the real FastAPI app, with
-``monitor._repository`` swapped for a fake so no real disk data is
-required.
+``monitor._repository`` swapped for a fake so no real disk data is required.
 
 .. list-table::
    :widths: 45 55
@@ -318,7 +441,7 @@ Charts are built for real against fixture data (via the real
    * - ``test_nlp_charts_uses_self_focus_ext_not_self_focus_for_neuro_self_focus``
      - Regression coverage at the API level for the LabDataBridge fix: a run whose responses have deliberately different self_focus (0.9) vs self_focus_ext (0.05) must not crash, and must render successfully using the corrected mapping (verified at the unit level in test_contract.py; this just confirms the whole path from a persisted response through to rendered HTML doesn't error).
 
-``tests/integration/test_runs_api.py`` (4 tests)
+``tests/integration/test_runs_api.py`` (7 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Functional API tests for the Stage 7 read-side endpoints
@@ -340,15 +463,21 @@ disk data is required.
      - GET /runs/summary?run_id=... for a run with responses returns the populated summary fragment.
    * - ``test_run_summary_fragment_for_unknown_run_returns_404_with_message``
      - GET /runs/summary?run_id=... for a run with no persisted responses returns 404, not a 500 or an empty table.
+   * - ``test_runs_page_renders_the_judging_comparison_picker``
+     - GET /runs with runs present shows the self-critic-vs-teacher-judging comparison form.
+   * - ``test_judging_comparison_fragment_shows_pass_rates_and_delta``
+     - GET /runs/judging_comparison for a self-critic run and a teacher-judged run renders both pass rates, both mode labels, and the delta -- a real end-to-end check of the router wiring, not just the underlying MetricsEngine call (already unit-pinned separately).
+   * - ``test_judging_comparison_fragment_for_unknown_run_returns_404_with_message``
+     - GET /runs/judging_comparison where one run_id has no persisted responses returns 404, not a 500.
 
 ``tests/integration/test_status_api.py`` (4 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Functional API tests for the ``/status`` endpoint
-(:mod:`api.routers.status`) -- through the real FastAPI app, with the
-underlying :func:`core.services.status_checks.check_ollama`/``check_nltk``/``check_spacy``
-swapped for deterministic fakes so this suite doesn't depend on a real
-local Ollama server, NLTK data directory, or spaCy model being present.
+Functional API tests for the ``/status`` endpoint (:mod:`api.routers.status`)
+-- through the real FastAPI app, with the underlying :func:`core.services.stat
+us_checks.check_ollama`/``check_nltk``/``check_spacy`` swapped for
+deterministic fakes so this suite doesn't depend on a real local Ollama
+server, NLTK data directory, or spaCy model being present.
 
 .. list-table::
    :widths: 45 55
@@ -383,15 +512,15 @@ local Ollama server, NLTK data directory, or spaCy model being present.
    * - ``test_neuro_self_focus_falls_back_to_bare_key_for_pre_stage6_entries``
      - A flat entry with only the old-style bare 'self_focus' key (no _ext) still resolves -- historical exports aren't left broken.
    * - ``test_schema_parsing``
-     - Validate that LabSchema can parse the flattened data correctly.
+     - Description is missing
    * - ``test_dataframe_build``
-     - Ensure the build_dataframe function creates columns and retains data.
+     - Description is missing
    * - ``test_no_nan_critical``
-     - Check for missing values in critical numeric columns.
+     - Description is missing
    * - ``test_pos_mapping``
-     - Verify the POS distribution is flattened correctly for Ternary plots.
+     - Description is missing
    * - ``test_neuro_fields_prefixed``
-     - Verify that psychological fields use the ``neuro_`` prefix in the DF.
+     - Description is missing
 
 ``tests/legacy_rag/test_ingestion_robustness.py`` (5 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -427,7 +556,7 @@ local Ollama server, NLTK data directory, or spaCy model being present.
    * - ``test_all_archetypes_present``
      - Ensure all expected archetype categories exist in the loaded dataset.
    * - ``test_valid_domains``
-     - Ensure all ingested chunks adhere to the allowed domain labels (schema validation).
+     - Ensure all ingested chunks adhere to the allowed domain labels (schema validation). Fixed 2026-08-24: the allowed set was a stale, lowercase 5-item list (behavior/speech/cognition/trigger/emotion) that no longer matched the real ``knowledge/rag/*.txt`` taxonomy at all -- confirmed directly by loading the real knowledge base and listing every domain actually present, not guessed. The real taxonomy is Capitalized and has grown to 8 categories; "emotion" doesn't appear in the real data at all. This was a stale test fixture, not an ingestion bug -- nothing about RAGEngine/FAISSVectorStore changed.
    * - ``test_no_empty_chunks``
      - Safety check: Ensure no empty or broken content chunks were ingested.
    * - ``test_chunk_length_quality``
@@ -439,7 +568,7 @@ local Ollama server, NLTK data directory, or spaCy model being present.
    * - ``test_retrieval_boundary_isolation``
      - Isolation test: Ensure a query for 'Structured' traits does not leak 'Expressive' content. Prevents cross-contamination in the vector space.
    * - ``test_cosine_alignment_integrity``
-     - Validate that the embedding model correctly ranks semantic similarity. Reference RAG chunk should have higher similarity to a relevant query than to noise.
+     - Validate that the embedding model correctly ranks semantic similarity. Reference RAG chunk should have higher similarity to a relevant query than to noise. Fixed 2026-08-24: the embedding model lives on the vector store (FAISSVectorStore.model, core/adapters/rag/vector_store.py), not directly on RAGEngine -- ``rag.model`` never existed; ``test_valid_domains`` right above this test already correctly uses the ``rag.store.*`` path. A one-attribute-path typo, not an API/architecture change.
    * - ``test_weighted_drift_calculation``
      - Validate the Drift Index formula. Checks if the system correctly identifies 'Out of Character' responses based on weighted attributes.
    * - ``test_retrieval_sanity_loop``
@@ -447,7 +576,7 @@ local Ollama server, NLTK data directory, or spaCy model being present.
    * - ``test_feature_correlation_consistency``
      - Structural Integrity Check: Ensures that the correlation between traits in the model output matches the correlation structure of the 'Ground Truth' dataset. This detects 'Psychological Chimera'—responses where individual scores might seem okay, but the combination of traits is logically impossible for the given archetype.
 
-``tests/legacy_rag/test_rag_logic.py`` (4 tests)
+``tests/legacy_rag/test_rag_logic.py`` (3 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. list-table::
@@ -456,10 +585,8 @@ local Ollama server, NLTK data directory, or spaCy model being present.
 
    * - Test
      - Description
-   * - ``test_filtered_semantic_retrieval_old``
-     - Test that filtering correctly isolates the target archetype even when 'baseline' has similar semantic content.
    * - ``test_filtered_semantic_retrieval``
-     - Archetype-filtered retrieval isolates the target archetype and returns semantically relevant content, checked against a broader keyword set than test_filtered_semantic_retrieval_old's narrower two-word check.
+     - Archetype-filtered retrieval isolates the target archetype and returns semantically relevant content, checked against a broader keyword set. Superseded 2026-08-24's own stale twin, ``test_filtered_semantic_retrieval_old`` (deleted): that version checked only for the literal words "conceptual"/"abstract" in the top hit, which broke once ``knowledge/rag/schizoid.txt``'s content was reworded -- the real top hit ("Limited social signaling, low need for reciprocal engagement.") is a genuinely correct, on-topic match, it just doesn't happen to contain those two specific words. This version already used a broader keyword set and was already passing before the old twin was removed, matching the ``data_contract.py``/``data_contract_old.py`` precedent -- keep the real one, drop the stale duplicate rather than patching a test that was already superseded.
    * - ``test_unfiltered_retrieval_ranking``
      - Debug test: See what is actually coming back first when unfiltered.
    * - ``test_empty_query_handling``
@@ -468,23 +595,27 @@ local Ollama server, NLTK data directory, or spaCy model being present.
 ``tests/unit/test_benchmark_charts.py`` (3 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Unit tests for :func:`web.plotting.benchmark_charts.build_benchmark_view` -- specifically the
-``/benchmark`` leaderboard's ``final_score`` formula, pinned directly against a small synthetic
-DataFrame rather than only observed indirectly through rendered HTML (the existing
-``tests/integration/test_benchmark_api.py`` coverage). Written alongside two real bugs found and
-fixed 2026-08-24 in the same block of code -- see ``web/plotting/benchmark_charts.py``'s own inline
-comments and ``docs/source/wiki/04-llm-analytics.rst``'s "A metric that contradicted itself" section
-for the full story:
+Unit tests for :func:`web.plotting.benchmark_charts.build_benchmark_view` --
+specifically the ``/benchmark`` leaderboard's ``final_score`` formula, pinned
+directly against a small synthetic DataFrame rather than only observed
+indirectly through rendered HTML (the existing
+``tests/integration/test_benchmark_api.py`` coverage). Written alongside two
+real bugs found and fixed 2026-08-24 in the same block of code -- see
+``web/plotting/benchmark_charts.py``'s own inline comments and
+``docs/source/wiki/04-llm-analytics.rst``'s "A metric that contradicted
+itself" section for the full story:
 
-1. The leaderboard used to weight a ``mimicry_score`` derived from ``semantic_overlap`` -- a field
-   that measures similarity to the bias/archetype *label*, not to any teacher response, and which
-   the Layer 1 echo-detection cascade (``core/analysis/response_classification.py``) rejects
-   responses for when it is *high*. The leaderboard was rewarding the same behavior the cascade
-   flags as a failure. Removed, not replaced with a different unvalidated proxy.
-2. The pass-rate component aggregated ``v_ok_numeric`` from ``df_valid`` (already filtered to
-   ``v_ok == 1``), whose mean is trivially always 1.0 for any student with at least one passing
-   response -- a real 50% pass rate and a real 100% pass rate scored identically. Fixed to use the
-   real, un-filtered per-student mean.
+1. The leaderboard used to weight a ``mimicry_score`` derived from
+``semantic_overlap`` -- a field that measures similarity to the bias/archetype
+*label*, not to any teacher response, and which the Layer 1 echo-detection
+cascade (``core/analysis/response_classification.py``) rejects responses for
+when it is *high*. The leaderboard was rewarding the same behavior the cascade
+flags as a failure. Removed, not replaced with a different unvalidated proxy.
+2. The pass-rate component aggregated ``v_ok_numeric`` from ``df_valid``
+(already filtered to ``v_ok == 1``), whose mean is trivially always 1.0 for
+any student with at least one passing response -- a real 50% pass rate and a
+real 100% pass rate scored identically. Fixed to use the real, un-filtered
+per-student mean.
 
 .. list-table::
    :widths: 45 55
@@ -502,11 +633,12 @@ for the full story:
 ``tests/unit/test_calculate_advanced_linguistic_metrics.py`` (9 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Unit tests for :mod:`core.analysis.calculate_advanced_linguistic_metrics` -- pinning
-``semantic_overlap`` (real sentence-embedding cosine similarity) on known-similar/known-dissimilar
-text pairs, per CLAUDE.md SS7's "pin expected outputs on known inputs" requirement for borrowed
-math. Previously untested: this module had no dedicated test file before this one, despite
-computing several metrics persisted on every response.
+Unit tests for :mod:`core.analysis.calculate_advanced_linguistic_metrics` --
+pinning ``semantic_overlap`` (real sentence-embedding cosine similarity) on
+known-similar/known-dissimilar text pairs, per CLAUDE.md SS7's "pin expected
+outputs on known inputs" requirement for borrowed math. Previously untested:
+this module had no dedicated test file before this one, despite computing
+several metrics persisted on every response.
 
 .. list-table::
    :widths: 45 55
@@ -533,18 +665,57 @@ computing several metrics persisted on every response.
    * - ``test_other_fields_unaffected_by_the_semantic_overlap_fix``
      - levenshtein_dist/expansion_ratio/word_count/unique_ratio are untouched by this fix -- pinned on a fixed input to confirm the surrounding metrics didn't shift.
 
+``tests/unit/test_cli_manage.py`` (11 tests)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Tests for :mod:`cli.manage` -- the operational console
+(``serve``/``status``/``list-runs``/ ``export-db``). Each subcommand's real
+dependency (``uvicorn.run``, the status checks, ``JSONLStore``,
+``export_run_to_db``) is monkeypatched at the point ``cli.manage`` imports it,
+not mocked out at a lower level -- so these tests exercise the real argument
+parsing and dispatch, only faking the side-effecting call each command
+ultimately makes.
+
+.. list-table::
+   :widths: 45 55
+   :header-rows: 1
+
+   * - Test
+     - Description
+   * - ``test_serve_calls_uvicorn_run_with_the_parsed_host_and_port``
+     - Description is missing
+   * - ``test_serve_no_reload_flag_disables_reload``
+     - Description is missing
+   * - ``test_status_prints_every_check_and_returns_0_when_all_ok``
+     - Description is missing
+   * - ``test_status_returns_1_when_any_check_fails``
+     - Description is missing
+   * - ``test_list_runs_prints_every_run_most_recent_first``
+     - Description is missing
+   * - ``test_list_runs_with_no_runs_prints_a_clear_message_not_a_blank_screen``
+     - Description is missing
+   * - ``test_export_db_prints_a_success_message_and_returns_0``
+     - Description is missing
+   * - ``test_export_db_passes_through_custom_db_path_and_overwrite_flag``
+     - Description is missing
+   * - ``test_export_db_on_error_prints_to_stderr_and_returns_1``
+     - Description is missing
+   * - ``test_build_parser_requires_a_subcommand``
+     - Description is missing
+   * - ``test_build_parser_export_db_requires_a_run_id``
+     - Description is missing
+
 ``tests/unit/test_cli_run_experiment.py`` (6 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Tests for :mod:`cli.run_experiment` -- Stage 15's config-driven batch
-runner. ``run()`` is exercised against a real ``ExperimentRunner`` wired
-with the same fake adapters (:class:`~tests.unit.test_experiment_runner
-.FakeLLMClient`/``FakeRepository``/``FakePromptStrategy``/``FakeJudge``)
-Stage 6's own tests use -- no orchestration logic is duplicated or mocked
-out, only the adapters are fake. ``main()`` is exercised end to end
-against a real temp TOML file, with :func:`cli.run_experiment.build_runner`
-monkeypatched to return the same fake-wired runner (avoiding a real Ollama
-call for a test).
+Tests for :mod:`cli.run_experiment` -- Stage 15's config-driven batch runner.
+``run()`` is exercised against a real ``ExperimentRunner`` wired with the same
+fake adapters (:class:`~tests.unit.test_experiment_runner
+.FakeLLMClient`/``FakeRepository``/``FakePromptStrategy``/``FakeJudge``) Stage
+6's own tests use -- no orchestration logic is duplicated or mocked out, only
+the adapters are fake. ``main()`` is exercised end to end against a real temp
+TOML file, with :func:`cli.run_experiment.build_runner` monkeypatched to
+return the same fake-wired runner (avoiding a real Ollama call for a test).
 
 .. list-table::
    :widths: 45 55
@@ -571,16 +742,15 @@ call for a test).
 Unit tests for :mod:`core.services.cluster_discovery` -- Stage 10.
 
 ``compute_fit_indices`` is pure, deterministic math (scikit-learn metric
-functions over already-fixed embeddings/labels, no randomness) and is
-pinned exactly on a fixed synthetic dataset, per CLAUDE.md SS7. The
-UMAP/HDBSCAN-driven functions (``run_plain_hdbscan``,
-``run_behavioral_topology``) are *not* pinned to exact cluster-ID
-assignments -- cluster label numbering is algorithm-internal and not
-guaranteed stable across scikit-learn/hdbscan/umap-learn versions or
-platforms even with a fixed ``random_state``, so pinning exact IDs would
-make the suite fragile for the wrong reason. Instead they're tested
-structurally: correct columns, correct shapes, correct filtering behavior,
-outlier-subset correctness.
+functions over already-fixed embeddings/labels, no randomness) and is pinned
+exactly on a fixed synthetic dataset, per CLAUDE.md SS7. The UMAP/HDBSCAN-
+driven functions (``run_plain_hdbscan``, ``run_behavioral_topology``) are
+*not* pinned to exact cluster-ID assignments -- cluster label numbering is
+algorithm-internal and not guaranteed stable across scikit-learn/hdbscan/umap-
+learn versions or platforms even with a fixed ``random_state``, so pinning
+exact IDs would make the suite fragile for the wrong reason. Instead they're
+tested structurally: correct columns, correct shapes, correct filtering
+behavior, outlier-subset correctness.
 
 .. list-table::
    :widths: 45 55
@@ -628,10 +798,10 @@ outlier-subset correctness.
 
 Unit tests for :mod:`utils.config_loader_short`'s dynamic ``__getattr__``
 resolver -- specifically the ``[EXPERIMENT]`` section added for the Stage 6
-total_tasks sanity cap, plus a regression check that the pre-existing
-sections it resolves (used by the live legacy app and by
-:mod:`core.adapters.ollama_client`/:mod:`core.adapters.jsonl_store`) are
-still untouched.
+total_tasks sanity cap, plus a regression check that the pre-existing sections
+it resolves (used by the live legacy app and by
+:mod:`core.adapters.ollama_client`/:mod:`core.adapters.jsonl_store`) are still
+untouched.
 
 .. list-table::
    :widths: 45 55
@@ -648,12 +818,53 @@ still untouched.
    * - ``test_pre_existing_directories_section_unaffected``
      - Adding the EXPERIMENT section didn't disturb the [DIRECTORIES] resolution JSONLStore depends on.
 
+``tests/unit/test_db_export.py`` (11 tests)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Unit tests for :mod:`core.services.db_export` -- copying one run from a source
+``Repository`` (the live ``JSONLStore`` in practice, faked here) into a real
+:class:`~core.adapters.sqlite_repo .SQLiteRepo`. Uses a real temp-file SQLite
+database (not ``:memory:``) for the target, since the overwrite/collision
+behavior being tested spans two separate ``SQLiteRepo`` constructions inside
+``export_run_to_db`` -- an in-memory database isn't shared across separate
+engine instances, so it couldn't actually exercise "the run is already in the
+target DB" the way a real file can.
+
+.. list-table::
+   :widths: 45 55
+   :header-rows: 1
+
+   * - Test
+     - Description
+   * - ``test_export_run_to_db_copies_run_metadata_and_every_response``
+     - Description is missing
+   * - ``test_export_run_to_db_on_completely_unknown_run_id_raises``
+     - No run metadata and no responses at all -- a bogus/typo'd run_id.
+   * - ``test_export_run_to_db_on_a_run_that_exists_but_has_no_responses_yet_raises``
+     - A real, distinct state from 'unknown run_id': the run was started (save_run called, metadata exists) but hasn't produced any responses yet -- e.g. exporting the instant after clicking Run, or a run that was stopped before its first response landed. Same error path as the bogus-id case (both have zero responses to copy), but a genuinely different real condition -- worth pinning separately so the two don't silently drift onto different error messages later.
+   * - ``test_export_run_to_db_second_export_without_overwrite_raises_not_duplicates``
+     - SQLiteRepo.save_response has no dedup key -- a naive re-export would silently duplicate every row. Confirms the default (overwrite=False) refuses instead.
+   * - ``test_export_run_to_db_with_overwrite_replaces_rather_than_duplicates``
+     - Description is missing
+   * - ``test_export_run_to_db_preserves_response_content_exactly_not_just_the_count``
+     - Every field of every response round-trips byte-for-byte through the export -- a count-only assertion would pass even if the copy silently dropped or mangled fields.
+   * - ``test_export_run_to_db_does_not_disturb_a_different_runs_data_already_in_the_target``
+     - Exporting run A into a database that already holds run B's data must leave run B's rows untouched -- the same isolation guarantee test_delete_responses_removes_only_the_target_runs _rows pins at the SQLiteRepo layer, exercised here end-to-end through the real export path.
+   * - ``test_export_run_to_db_creates_the_target_directory_if_it_does_not_exist_yet``
+     - A fresh checkout has no results/ directory yet -- the first-ever export must not crash on a missing parent directory (SQLiteRepo's own __init__ already handles this; confirmed here at the export-service level, the actual call path a first-time user hits).
+   * - ``test_export_run_to_db_round_trips_edge_case_value_types_through_the_json_column``
+     - None, nested lists/dicts, booleans, and unicode text must all survive the SQLite JSON column exactly -- a real response record has several of these (rag_chunks_count is int, teacher_model can be None for self-critic runs, output is free-form text).
+   * - ``test_get_sync_status_reflects_exported_runs_and_omits_unexported_ones``
+     - core.services.db_export.get_sync_status() is a thin wrapper around SQLiteRepo's own method -- confirms it's wired to the right database and doesn't invent/omit entries.
+   * - ``test_get_sync_status_on_a_database_that_does_not_exist_yet_returns_empty_not_a_crash``
+     - A fresh checkout has no results/nn_lab.db yet -- the /db_export page's first-ever render must show every run as 'not synced', not 500.
+
 ``tests/unit/test_demo_queue_bridge.py`` (3 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Unit tests for :func:`core.services._demo_runner.bridge_to_queue` in
-isolation -- the one line in Stage 1's SSE mechanism that actually crosses
-the worker-thread/event-loop boundary.
+Unit tests for :func:`core.services._demo_runner.bridge_to_queue` in isolation
+-- the one line in Stage 1's SSE mechanism that actually crosses the worker-
+thread/event-loop boundary.
 
 .. list-table::
    :widths: 45 55
@@ -671,10 +882,10 @@ the worker-thread/event-loop boundary.
 ``tests/unit/test_domain_interfaces.py`` (9 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Unit tests for the Stage 2 domain interfaces
-(:mod:`core.domain.interfaces`) -- confirms each ``Protocol`` is genuinely
-checkable at runtime (a conforming fake passes ``isinstance``, a
-non-conforming one fails it) rather than trivially satisfied by anything.
+Unit tests for the Stage 2 domain interfaces (:mod:`core.domain.interfaces`)
+-- confirms each ``Protocol`` is genuinely checkable at runtime (a conforming
+fake passes ``isinstance``, a non-conforming one fails it) rather than
+trivially satisfied by anything.
 
 .. list-table::
    :widths: 45 55
@@ -776,12 +987,45 @@ shapes and the full persisted entry shape.
    * - ``test_genuine_substantive_response_reaches_the_real_judge``
      - A real, substantive, non-echo response passes both Layer 0 and Layer 1 and reaches the actual judge -- the cascade doesn't reject legitimate content.
 
+``tests/unit/test_generate_tag_cloud.py`` (7 tests)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Unit tests for :mod:`utils.generate_tag_cloud` -- pins the glossary-
+term/module-name extraction and real-frequency-counting logic against fixed
+temp fixtures, not the live repo content (so these don't silently break just
+because someone adds a new glossary term or module). CLAUDE.md SS7: a script
+with real parsing logic gets a real test, even a one-off "run manually"
+utility script -- the same discipline already applied to
+``utils/list_tests.py``'s own two real bugs found this session.
+
+.. list-table::
+   :widths: 45 55
+   :header-rows: 1
+
+   * - Test
+     - Description
+   * - ``test_extract_glossary_terms_pulls_only_term_lines_not_definitions``
+     - Description is missing
+   * - ``test_extract_glossary_terms_handles_multiple_glossary_blocks``
+     - A page can have more than one .. glossary:: block (this project's real glossary.rst does, one per category) -- all of them must be picked up, not just the first.
+   * - ``test_extract_glossary_terms_on_empty_file_returns_empty_list``
+     - Description is missing
+   * - ``test_extract_module_names_excludes_init_and_pycache``
+     - Description is missing
+   * - ``test_extract_module_names_replaces_underscores_with_spaces``
+     - Description is missing
+   * - ``test_real_frequency_counts_whole_word_case_insensitive_occurrences``
+     - Description is missing
+   * - ``test_real_frequency_never_returns_zero_even_for_an_unmentioned_term``
+     - Description is missing
+
 ``tests/unit/test_hallucination_check.py`` (6 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Unit tests for :mod:`core.analysis.hallucination_check` -- Layer 2 of the per-response cascade
-(CLAUDE.md SS3a). Pins real NLI cross-encoder output on fixed input pairs, per CLAUDE.md SS7's rule
-that a metric borrowed from a third-party model still gets a pinned-fixture test.
+Unit tests for :mod:`core.analysis.hallucination_check` -- Layer 2 of the per-
+response cascade (CLAUDE.md SS3a). Pins real NLI cross-encoder output on fixed
+input pairs, per CLAUDE.md SS7's rule that a metric borrowed from a third-
+party model still gets a pinned-fixture test.
 
 .. list-table::
    :widths: 45 55
@@ -832,13 +1076,64 @@ write/read against a temp directory (no shared state with the real
    * - ``test_list_runs_on_empty_store_returns_empty_list``
      - list_runs() on a fresh directory with no runs returns [] rather than erroring.
 
-``tests/unit/test_metrics_engine.py`` (3 tests)
+``tests/unit/test_knowledge_graph.py`` (11 tests)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Unit tests for :mod:`core.tabs.knowledge_graph` -- the legacy, CLAUDE.md
+SS1-quarantined Neo4j subsystem, exercised here for the first time (previously
+zero test coverage, confirmed by a 2026-09-05 audit). Runs the real
+:meth:`KnowledgeGraph.knowledge_graph_tab` Streamlit UI headlessly via
+``streamlit.testing.v1.AppTest`` and a fake, in-memory ``py2neo.Graph`` stand-
+in (:class:`_FakeGraph`) -- no live Neo4j server, no Docker (this project has
+neither, by design).
+
+This does not (and cannot, without a live server) prove the real Cypher/GDS
+calls succeed against an actual Neo4j+GDS install -- that was verified
+manually, once, for real, during the same audit (see
+``docs/source/wiki/07-knowledge-graph-results.rst`` for the captured real
+output). What these tests lock in instead is the thing a live-server test
+can't cheaply guard against regressing: the *query construction and call
+ordering* -- which Cypher text is sent, with which parameters, and in which
+sequence -- since that's exactly the class of bug the 2026-09-05 audit found
+(script-4 called ``gds.pageRank.stream`` without first checking/creating its
+graph projection, unlike scripts 1/3).
+
+.. list-table::
+   :widths: 45 55
+   :header-rows: 1
+
+   * - Test
+     - Description
+   * - ``test_sync_button_sends_the_real_merge_cypher_with_every_row``
+     - "Sync history to Neo4j" sends one UNWIND/MERGE/MERGE/MERGE Cypher statement carrying every DataFrame row as the `$rows` parameter -- the exact query the real, manually-verified run used.
+   * - ``test_pagerank_script_1_projects_the_graph_only_when_it_does_not_already_exist``
+     - gds.graph.project is called before gds.pageRank.stream when archetypeGraph doesn't exist yet -- and is skipped (not re-projected) when it already does, matching GDS's own "project once, query many times" catalog model.
+   * - ``test_pagerank_script_4_now_projects_before_streaming_regression_fence``
+     - Regression fence for the real bug found in the 2026-09-05 audit: script-4 used to call gds.pageRank.stream('experimentGraph') with no exists-check/projection guard at all, unlike scripts 1/3 -- meaning it only ever worked by accident, if script-3 happened to run first in the same GDS session. Fixed to match the same exists-check-then-project pattern; this test fails loudly if that guard is ever removed again.
+   * - ``test_pagerank_script_2_enriches_metadata_with_a_separate_merge_set_cypher``
+     - "Run PageRank script-2" writes archetype/bias metadata via MERGE+SET (no GDS involved -- plain Cypher property writes) and then reads it back via a separate MATCH query.
+   * - ``test_parse_rag_chunks_recovers_archetype_and_category_from_the_real_serialized_format``
+     - Matches the exact format ExperimentRunner._run_one writes: f"[{archetype} \| {category}]\n{text}", blocks joined by "\n\n".
+   * - ``test_parse_rag_chunks_handles_empty_none_and_malformed_input``
+     - Description is missing
+   * - ``test_build_rows_layer0_rejected_response_reaches_nothing_past_layer0``
+     - A Layer-0-rejected response never reaches Layer1/Layer2/Judge in the real pipeline (ExperimentRunner._run_one's early-return) -- its row must reflect that, not default to 'reached' just because v_ok/teacher fields exist on every row regardless.
+   * - ``test_build_rows_echo_rejected_response_can_still_reach_layer2_but_never_the_judge``
+     - Real, non-obvious pipeline behavior, confirmed by reading ExperimentRunner._run_one directly: Layer 2's hallucination check runs BEFORE the echo-vs-real-judge branch and is unconditional on echo status -- so an echo-rejected response can have layer2_checked=True even though it never reaches a real judge call (the verdict is synthesized, not from self._judge.evaluate(...)). reached_judge must stay False regardless of layer2_checked.
+   * - ``test_build_rows_a_response_that_reaches_a_real_judge_call_is_marked_correctly``
+     - Description is missing
+   * - ``test_build_rows_parses_real_rag_chunks_only_when_rag_enabled``
+     - Description is missing
+   * - ``test_sync_failure_mode_graph_button_sends_the_bootstrap_and_the_unwind_sync``
+     - The new "Sync failure-mode graph" button (distinct from the original "Sync history to Neo4j" button, which only ever wrote the plain Archetype-Bias co-occurrence graph) sends two real Cypher statements: the one-time CascadeStage/PRECEDES bootstrap, then the per-response UNWIND/MERGE sync carrying the resolved cascade-lineage rows.
+
+``tests/unit/test_metrics_engine.py`` (7 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Unit tests for :class:`core.services.metrics_engine.MetricsEngine` --
-aggregation pinned against a fixed fixture of response records (CLAUDE.md
-SS7: pin exact totals so a future change surfaces as a failing test, not a
-silent drift).
+aggregation pinned against a fixed fixture of response records (CLAUDE.md SS7:
+pin exact totals so a future change surfaces as a failing test, not a silent
+drift).
 
 .. list-table::
    :widths: 45 55
@@ -852,14 +1147,23 @@ silent drift).
      - summarize_run() on a run with no persisted responses raises RunNotFoundError rather than silently returning an empty summary.
    * - ``test_summarize_run_with_no_sweep_reports_na``
      - A run with no sweep_param/val on any response reports 'N/A' rather than crashing on min()/max() of nothing.
+   * - ``test_compare_judging_modes_pins_pass_rate_and_delta_for_two_runs``
+     - 3/4 clean self-critic responses pass (0.75), 1/2 clean teacher-judged responses pass (0.5) -- delta is exactly 0.25, not recomputed loosely.
+   * - ``test_compare_judging_modes_unknown_run_raises_run_not_found``
+     - Description is missing
+   * - ``test_compare_judging_modes_run_with_only_rejected_responses_reports_none_pass_rate_not_a_crash``
+     - A run where every response was Layer-0-rejected (word_count never computed) has real responses on disk but nothing to average -- delta must be None, not a ZeroDivisionError.
+   * - ``test_compare_judging_modes_without_run_metadata_reports_unknown_labels_not_a_crash``
+     - list_runs() returning nothing for a run_id (e.g. metadata not yet indexed) degrades to self_critic=None/teacher_model=None rather than raising.
 
 ``tests/unit/test_neuro_metrics.py`` (5 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Unit tests for :class:`core.analysis.neuro_metrics.NeuroMetrics` -- pinning ``cognitive_load`` on
-hand-computed fixed inputs per CLAUDE.md SS7's "pin expected outputs on known inputs" requirement.
-Previously untested: this module had no dedicated test file before this one, despite computing
-several metrics persisted on every response.
+Unit tests for :class:`core.analysis.neuro_metrics.NeuroMetrics` -- pinning
+``cognitive_load`` on hand-computed fixed inputs per CLAUDE.md SS7's "pin
+expected outputs on known inputs" requirement. Previously untested: this
+module had no dedicated test file before this one, despite computing several
+metrics persisted on every response.
 
 .. list-table::
    :widths: 45 55
@@ -886,8 +1190,8 @@ Unit tests for :class:`core.analysis.nlp_science.PsychScientist` -- pins
 (CLAUDE.md SS7: don't assume a borrowed metric is correct, pin outputs on
 known inputs so a dependency/logic change surfaces as a failing test). This
 closes the gap flagged in the QA traceability matrix (R9): the linguistic
-metrics used in production had only indirect coverage via the full
-entry-shape test, never a direct pinned test against a fixed input.
+metrics used in production had only indirect coverage via the full entry-shape
+test, never a direct pinned test against a fixed input.
 
 .. list-table::
    :widths: 45 55
@@ -918,15 +1222,15 @@ entry-shape test, never a direct pinned test against a fixed input.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Unit tests for :class:`core.adapters.ollama_client.OllamaClient` -- client
-construction (native-API host derivation from config) and that
-``generate()`` maps Ollama's native ``ChatResponse`` fields onto
-``GenerationResult`` correctly, including the performance-telemetry fields
-added when this adapter switched from the OpenAI-compatible endpoint to
-Ollama's native ``/api/chat`` (the compat endpoint's response has no
-token-count or timing-breakdown fields at all -- confirmed by querying both
-live and comparing the raw JSON, not assumed). No real network: the
-constructed ``ollama.Client`` is swapped for a fake after construction,
-since building the client object itself makes no network call.
+construction (native-API host derivation from config) and that ``generate()``
+maps Ollama's native ``ChatResponse`` fields onto ``GenerationResult``
+correctly, including the performance-telemetry fields added when this adapter
+switched from the OpenAI-compatible endpoint to Ollama's native ``/api/chat``
+(the compat endpoint's response has no token-count or timing-breakdown fields
+at all -- confirmed by querying both live and comparing the raw JSON, not
+assumed). No real network: the constructed ``ollama.Client`` is swapped for a
+fake after construction, since building the client object itself makes no
+network call.
 
 .. list-table::
    :widths: 45 55
@@ -1008,8 +1312,8 @@ known inputs so a future change surfaces as a failing test).
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Unit tests for :class:`core.adapters.rag.knowledge_base.RAGKnowledgeBase` --
-the KnowledgeBase adapter wrapping RAGEngine, tested against a fake engine
-(no real embeddings/FAISS index needed here; that's already covered by the
+the KnowledgeBase adapter wrapping RAGEngine, tested against a fake engine (no
+real embeddings/FAISS index needed here; that's already covered by the
 existing ``test_rag.py``/``test_rag_logic.py`` suites against the real
 engine).
 
@@ -1031,11 +1335,13 @@ engine).
 ``tests/unit/test_response_classification.py`` (10 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Unit tests for :mod:`core.analysis.response_classification` -- Layer 0 (deterministic response
-classification) and Layer 1 (embedding-based echo detection) of the per-response evaluation
-cascade (CLAUDE.md SS3a). See the module's own docstring for why Layer 1's threshold direction is
-the opposite of the standard "low similarity means off-topic" STS intuition -- calibrated against
-real generated data, not guessed, and pinned here on the same real examples that calibration used.
+Unit tests for :mod:`core.analysis.response_classification` -- Layer 0
+(deterministic response classification) and Layer 1 (embedding-based echo
+detection) of the per-response evaluation cascade (CLAUDE.md SS3a). See the
+module's own docstring for why Layer 1's threshold direction is the opposite
+of the standard "low similarity means off-topic" STS intuition -- calibrated
+against real generated data, not guessed, and pinned here on the same real
+examples that calibration used.
 
 .. list-table::
    :widths: 45 55
@@ -1064,8 +1370,28 @@ real generated data, not guessed, and pinned here on the same real examples that
    * - ``test_is_echo_response_boundary_at_exactly_the_threshold``
      - Exactly at the threshold is not flagged -- only strictly above it is, matching the real data's clean gap sitting well past 0.5 on the echo side.
 
-``tests/unit/test_sqlite_repo.py`` (8 tests)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``tests/unit/test_serve_docs.py`` (2 tests)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Unit tests for :mod:`utils.serve_docs` -- pins the one real piece of logic
+(refusing to start against a missing/unbuilt docs directory, with a helpful
+message) rather than the thin ``http.server``/``argparse`` wrapping around it,
+which is already exercised live (manual smoke test against a real local port,
+confirmed 200 + real page bytes served).
+
+.. list-table::
+   :widths: 45 55
+   :header-rows: 1
+
+   * - Test
+     - Description
+   * - ``test_main_raises_system_exit_with_a_helpful_message_when_build_dir_is_missing``
+     - Description is missing
+   * - ``test_default_docs_html_dir_points_at_the_real_sphinx_build_output_location``
+     - Description is missing
+
+``tests/unit/test_sqlite_repo.py`` (13 tests)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Unit tests for :class:`core.adapters.sqlite_repo.SQLiteRepo` -- CRUD against
 an in-memory SQLite database (``:memory:``, no file left behind).
@@ -1086,20 +1412,30 @@ an in-memory SQLite database (``:memory:``, no file left behind).
      - load_responses(run_id) does not leak another run's responses -- the normalization Stage 0's finding motivated.
    * - ``test_load_responses_without_run_id_returns_all_runs``
      - load_responses() with no run_id returns responses across every run.
+   * - ``test_delete_responses_removes_only_the_target_runs_rows_and_returns_the_count``
+     - delete_responses(run_id) clears one run's rows, leaves other runs' rows untouched, and reports how many were removed -- the mechanism export_run_to_db's overwrite path relies on.
    * - ``test_save_run_twice_with_same_id_upserts_rather_than_duplicating``
      - Saving a run with an already-used run_id updates it in place (merge), not a duplicate row.
    * - ``test_list_runs_returns_saved_run_metadata_most_recent_first``
      - list_runs() reflects every save_run() call, ordered by started_at descending, reconstructed as real RunRecord entities.
    * - ``test_list_runs_on_empty_repo_returns_empty_list``
      - list_runs() on a fresh repository with no runs returns [] rather than erroring.
+   * - ``test_save_run_stamps_last_synced_at_and_get_sync_status_reports_it``
+     - save_run() records its own write time (not the run's started_at) -- get_sync_status() exposes it for the /db_export page's "Export status" column.
+   * - ``test_get_sync_status_omits_runs_never_saved``
+     - A run_id that was never save_run()'d is simply absent from the dict, not None or a KeyError.
+   * - ``test_save_run_twice_updates_last_synced_at_to_the_newer_write``
+     - Re-exporting an already-synced run refreshes its timestamp, matching the merge/upsert behavior save_run already has for the rest of the row.
+   * - ``test_opening_a_database_created_before_last_synced_at_existed_self_heals``
+     - A pre-2026-08-25 database's runs table lacks last_synced_at entirely -- confirmed by building one by hand (bypassing SQLiteRepo's current schema) rather than assumed. Opening it through SQLiteRepo must not raise OperationalError; it should transparently add the column.
 
 ``tests/unit/test_status_checks.py`` (6 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Unit tests for :mod:`core.services.status_checks` -- the minimal
 Ollama/NLTK/spaCy reachability checks that replace the legacy sidebar's
-green/red buttons (Neo4j deliberately excluded, see the module docstring
-for why). No real network/filesystem: ``ollama.Client``/``nltk.data.find``/
+green/red buttons (Neo4j deliberately excluded, see the module docstring for
+why). No real network/filesystem: ``ollama.Client``/``nltk.data.find``/
 ``spacy.util.get_installed_models`` are monkeypatched so these run fast and
 deterministically regardless of whether a real Ollama server, NLTK data
 directory, or spaCy model is present.
@@ -1126,13 +1462,14 @@ directory, or spaCy model is present.
 ``tests/unit/test_structured_judge.py`` (8 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Unit tests for :class:`core.adapters.structured_judge.StructuredJudge` -- replaces
-``tests/unit/test_naive_judge.py`` (deleted alongside ``core/adapters/naive_judge.py``) now that
-CLAUDE.md SS4/SS6's author-swap boundary has been crossed by explicit author decision, not a
-default "AI-agent improves whatever it finds" change. Covers real JSON parsing (the fix), the
-malformed-response fallback (now distinguishable from a genuine "no" via ``rationale``, unlike the
-old substring-matching bug), and confirms the request shape still asks the model for structured
-JSON.
+Unit tests for :class:`core.adapters.structured_judge.StructuredJudge` --
+replaces ``tests/unit/test_naive_judge.py`` (deleted alongside
+``core/adapters/naive_judge.py``) now that CLAUDE.md SS4/SS6's author-swap
+boundary has been crossed by explicit author decision, not a default "AI-agent
+improves whatever it finds" change. Covers real JSON parsing (the fix), the
+malformed-response fallback (now distinguishable from a genuine "no" via
+``rationale``, unlike the old substring-matching bug), and confirms the
+request shape still asks the model for structured JSON.
 
 .. list-table::
    :widths: 45 55
@@ -1160,10 +1497,11 @@ JSON.
 ``tests/unit/test_syntactic_complexity.py`` (5 tests)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Unit tests for :mod:`core.analysis.syntactic_complexity` -- pins ``dependency_distance`` on fixed
-inputs against real spaCy/TextDescriptives output, per CLAUDE.md SS7's rule that a metric borrowed
-from a third-party library still gets its own pinned-fixture test, not just trust that the library
-is correct.
+Unit tests for :mod:`core.analysis.syntactic_complexity` -- pins
+``dependency_distance`` on fixed inputs against real spaCy/TextDescriptives
+output, per CLAUDE.md SS7's rule that a metric borrowed from a third-party
+library still gets its own pinned-fixture test, not just trust that the
+library is correct.
 
 .. list-table::
    :widths: 45 55
