@@ -29,7 +29,7 @@ real implementation behind it and is the primary way to run the app (see
    }
 
    package "api/  (FastAPI)" {
-     [Routers\n(experiments, runs, analytics, nlp, clusters,\nmodel_evo, benchmark, monitor, faq)] as ROUTERS
+     [Routers\n(experiments, runs, analytics, nlp, clusters,\nmodel_evo, benchmark, monitor, faq,\ndb_export, api_status, knowledge_graph)] as ROUTERS
      [SSE endpoint\n(EventSourceResponse)] as SSE
    }
 
@@ -45,6 +45,7 @@ real implementation behind it and is the primary way to run the app (see
      interface PromptStrategy as IPROMPT
      interface Repository as IREPO
      interface KnowledgeBase as IKB
+     interface GraphRepository as IGRAPH
    }
 
    package "core.adapters/  (concrete implementations)" {
@@ -54,6 +55,7 @@ real implementation behind it and is the primary way to run the app (see
      [RAG adapters\n(FAISS + SentenceTransformers)] as ARAG
      [StructuredJudge\n(2026-08-24 author-directed swap)] as AJUDGE
      [NaivePromptStrategy] as APROMPT
+     [Neo4jGraphRepo\n(2026-09-05, promoted from\nthe legacy Neo4j subsystem)] as AGRAPH
    }
 
    package "External systems" {
@@ -61,11 +63,11 @@ real implementation behind it and is the primary way to run the app (see
      database SQLite as SQLITE
      database "JSONL files" as JSONL
      database "knowledge/rag/*.txt" as KB
+     database Neo4j as NEO4J
    }
 
    package "Untouched legacy  (not part of this rewrite)" #FFDDDD {
-     [run_knowledge_graph.py] as KGSCRIPT
-     database Neo4j as NEO4J
+     [run_knowledge_graph.py\n(PageRank scripts, plain Archetype/Bias\nsync, Hypothesis Testing,\nUncertainty Analysis only)] as KGSCRIPT
    }
 
    WEB --> ROUTERS
@@ -74,6 +76,7 @@ real implementation behind it and is the primary way to run the app (see
    ROUTERS --> RUNNER
    ROUTERS --> METRICS
    ROUTERS --> CLUSTERSVC
+   ROUTERS --> IGRAPH
    SSE ..> RUNNER : progress events
    RUNNER --> ILLM
    RUNNER --> IJUDGE
@@ -89,11 +92,13 @@ real implementation behind it and is the primary way to run the app (see
    IREPO ..|> AJSONL
    IREPO ..|> ASQLITE
    IKB ..|> ARAG
+   IGRAPH ..|> AGRAPH
 
    AOLLAMA --> OLLAMA
    AJSONL --> JSONL
    ASQLITE --> SQLITE
    ARAG --> KB
+   AGRAPH --> NEO4J
 
    KGSCRIPT ..> AJSONL : reads runs via
    KGSCRIPT --> NEO4J
@@ -105,7 +110,7 @@ Entity-relationship diagram
 One run has many responses, on both storage backends -- generated directly
 from the real schemas, not idealized. ``JSONLStore`` (the live backend) keeps
 this as two files per run rather than a database; ``SQLiteRepo`` (built and
-tested, not yet wired to any endpoint -- see :doc:`features`) keeps it as two
+tested, reachable since 2026-08-25 via ``/db_export`` -- see :doc:`features`) keeps it as two
 real tables with a foreign key. Both sides serialize the *same* logical
 records: :class:`~core.domain.entities.RunRecord` (run-level metadata) and
 one persisted-response dict per generation call (the full 66-key schema
@@ -357,7 +362,12 @@ diagram. Colors group the same three CLAUDE.md SS3a/SS3b-derived categories the 
 it's a cross-cutting concept, not one page. Updated 2026-09-05 with a fifth branch for the separate
 Neo4j knowledge-graph entry point (``run_knowledge_graph.py``, its own standalone Streamlit process,
 not reachable from ``_nav.html`` at all) -- omitted until now, which meant this "what can I do here"
-map was silently incomplete for anyone who didn't already know that page existed.
+map was silently incomplete for anyone who didn't already know that page existed. Updated again the
+same day, later: the failure-mode graph (four root-cause capabilities) was promoted out of that
+Streamlit-only branch into the main ``[corpus]``-colored section as ``Knowledge Graph
+/knowledge_graph``, matching its real new location in ``_nav.html`` -- the orange Streamlit branch
+now shows only what's still there (the original Archetype/Bias co-occurrence graph, PageRank-1..4,
+and the two pandas/scipy-only sub-tabs).
 
 .. uml::
 
@@ -399,6 +409,11 @@ map was silently incomplete for anyone who didn't already know that page existed
    ***[#3a7d5c] Behavioral topology (UMAP)
    **[#3a7d5c] Benchmark /benchmark
    ***[#3a7d5c] Weighted leaderboard
+   **[#3a7d5c] Knowledge Graph /knowledge_graph
+   ***[#3a7d5c] Sync failure-mode graph\n(cascade lineage, RAG provenance)
+   ***[#3a7d5c] Echo-rejections by model
+   ***[#3a7d5c] Terminal cascade stage by archetype
+   ***[#3a7d5c] RAG chunk categories vs. echo
    **[#6b6b6b] System Monitor /monitor
    ***[#6b6b6b] Schema / dtype inspector
    **[#6b6b6b] Service status
@@ -409,11 +424,6 @@ map was silently incomplete for anyone who didn't already know that page existed
    ***[#b5651d] streamlit run run_knowledge_graph.py
    ***[#b5651d] Sync history to Neo4j\n(Archetype<->Bias co-occurrence)
    ***[#b5651d] PageRank-1..4 (GDS)
-   ***[#b5651d] Root Cause (Failure-Mode Graph)
-   ****[#b5651d] Sync failure-mode graph\n(cascade lineage, RAG provenance)
-   ****[#b5651d] Echo-rejections by model
-   ****[#b5651d] Terminal cascade stage by archetype
-   ****[#b5651d] RAG chunk categories vs. echo
    ***[#b5651d] Hypothesis Testing / Uncertainty Analysis\n(pandas/scipy, no graph queries)
    @endmindmap
 
@@ -537,15 +547,22 @@ Original sync + PageRank flow (scripts 1-3 untouched; script 4 got a real bug fi
    stop
    @enduml
 
-Failure-mode / cascade-lineage graph (new, additive, 2026-09-05)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Failure-mode / cascade-lineage graph -- promoted into the FastAPI app, 2026-09-05
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A second sync, a new "Root Cause (Failure-Mode Graph)" tab -- does not touch or replace the
-Archetype/Bias/PageRank graph above. Models the actual per-response cascade (the same write-path
-activity diagram earlier on this page) as explicit lineage edges, so a failure becomes a graph
-traversal instead of a correlation you already have to suspect. Schema and real, captured query
-results (a real 500-response run: 27 vs. 12 echo-rejections by model; one RAG knowledge category
-linked to 36 of the run's echo failures): :doc:`wiki/07-knowledge-graph-results`.
+Added the same day as a Streamlit tab (a second sync, not touching the Archetype/Bias/PageRank
+graph above), then **promoted the same day, again**, out of ``core/tabs/knowledge_graph.py``
+entirely and into the layered architecture -- a real, full-depth reversal for this one capability
+(``core.domain.interfaces.GraphRepository`` + ``core.adapters.neo4j_repo.Neo4jGraphRepo`` +
+``api/routers/knowledge_graph.py``), unlike the narrow, docstring-or-config-only exceptions
+recorded elsewhere in CLAUDE.md SS1. It is now reachable as a real page, ``/knowledge_graph``,
+appearing in the component diagram above like any other router -- **not** part of the "Untouched
+legacy" package anymore. Models the actual per-response cascade (the same write-path activity
+diagram earlier on this page) as explicit lineage edges, so a failure becomes a graph traversal
+instead of a correlation you already have to suspect. Schema and real, captured query results (a
+real 500-response run: 27 vs. 12 echo-rejections by model; one RAG knowledge category linked to 36
+of the run's echo failures) are unchanged by the move -- only the code's location changed, not the
+Cypher or the findings: :doc:`wiki/07-knowledge-graph-results`.
 
 .. uml::
 

@@ -12,13 +12,16 @@ tests lock in instead is the thing a live-server test can't cheaply guard agains
 *query construction and call ordering* -- which Cypher text is sent, with which parameters, and in
 which sequence -- since that's exactly the class of bug the 2026-09-05 audit found (script-4 called
 ``gds.pageRank.stream`` without first checking/creating its graph projection, unlike scripts 1/3).
+
+The failure-mode/cascade-lineage graph this module's tests originally also covered was promoted out
+of ``core/tabs/knowledge_graph.py`` the same day (see that module's own docstring) into
+:mod:`core.adapters.neo4j_repo` -- its tests moved with it, to
+:mod:`tests.unit.test_neo4j_repo`. What remains here covers exactly what's still in this Streamlit
+module: the plain Archetype/Bias co-occurrence sync and the 4 PageRank scripts.
 """
 
-import numpy as np
 import pandas as pd
 from streamlit.testing.v1 import AppTest
-
-from core.tabs.knowledge_graph import _build_failure_mode_rows, _parse_rag_chunks
 
 
 def _kg_tab_script(df):
@@ -191,163 +194,4 @@ def test_pagerank_script_2_enriches_metadata_with_a_separate_merge_set_cypher(mo
     assert any("SET a.dimension = row.dimension" in q for q in queries)
     assert any("SET b.severity = row.severity" in q for q in queries)
     assert any("MATCH (a:Archetype)-[:ASSOCIATED_WITH]->(b:Bias)" in q for q in queries)
-    assert not at.exception
-
-
-# --- Failure-mode/cascade-lineage graph (2026-09-05) -----------------------------------------
-
-
-def test_parse_rag_chunks_recovers_archetype_and_category_from_the_real_serialized_format():
-    """Matches the exact format ExperimentRunner._run_one writes:
-    f"[{archetype} | {category}]\\n{text}", blocks joined by "\\n\\n"."""
-    ctx = "[baseline | Behavior]\nSome behavior text.\n\n[paranoid | Speech]\nSome speech text."
-    assert _parse_rag_chunks(ctx) == [
-        {"archetype": "baseline", "category": "Behavior"},
-        {"archetype": "paranoid", "category": "Speech"},
-    ]
-
-
-def test_parse_rag_chunks_handles_empty_none_and_malformed_input():
-    assert _parse_rag_chunks("") == []
-    assert _parse_rag_chunks(None) == []
-    assert _parse_rag_chunks(float("nan")) == []
-    assert _parse_rag_chunks("not the expected bracket format at all") == []
-
-
-def test_build_rows_layer0_rejected_response_reaches_nothing_past_layer0():
-    """A Layer-0-rejected response never reaches Layer1/Layer2/Judge in the real pipeline
-    (ExperimentRunner._run_one's early-return) -- its row must reflect that, not default to
-    'reached' just because v_ok/teacher fields exist on every row regardless."""
-    df = pd.DataFrame(
-        [
-            {
-                "run_id": "run-a",
-                "step": "1/10",
-                "archetype": "Neutral",
-                "bias": "formal",
-                "student": "qwen:latest",
-                "teacher": "qwen:latest",
-                "layer0_classification": "TRUNCATED",
-                "layer1_echo_detected": False,
-                "v_ok": False,
-                "v_confidence": 1.0,
-                "rag_enabled": False,
-            }
-        ]
-    )
-    row = _build_failure_mode_rows(df)[0]
-    assert row["layer0_classification"] == "TRUNCATED"
-    assert row["reached_layer1"] is False
-    assert row["reached_layer2"] is False
-    assert row["reached_judge"] is False
-    assert row["chunks"] == []
-
-
-def test_build_rows_echo_rejected_response_can_still_reach_layer2_but_never_the_judge():
-    """Real, non-obvious pipeline behavior, confirmed by reading ExperimentRunner._run_one
-    directly: Layer 2's hallucination check runs BEFORE the echo-vs-real-judge branch and is
-    unconditional on echo status -- so an echo-rejected response can have layer2_checked=True
-    even though it never reaches a real judge call (the verdict is synthesized, not from
-    self._judge.evaluate(...)). reached_judge must stay False regardless of layer2_checked."""
-    df = pd.DataFrame(
-        [
-            {
-                "run_id": "run-a",
-                "step": "2/10",
-                "archetype": "Neutral",
-                "bias": "formal",
-                "student": "mistral:7b-instruct-q4_K_M",
-                "teacher": "qwen:latest",
-                "layer0_classification": "VALID",
-                "layer1_echo_detected": True,
-                "semantic_overlap": 0.91,
-                "layer2_checked": True,
-                "layer2_predicted_label": "neutral",
-                "layer2_contradiction_score": 0.12,
-                "v_ok": False,
-                "v_confidence": 1.0,
-                "rag_enabled": False,
-            }
-        ]
-    )
-    row = _build_failure_mode_rows(df)[0]
-    assert row["reached_layer1"] is True
-    assert row["layer1_result"] == "ECHO"
-    assert row["reached_layer2"] is True
-    assert row["layer2_result"] == "neutral"
-    assert row["reached_judge"] is False, "an echo-rejected response must never be attributed to a real judge call"
-
-
-def test_build_rows_a_response_that_reaches_a_real_judge_call_is_marked_correctly():
-    df = pd.DataFrame(
-        [
-            {
-                "run_id": "run-a",
-                "step": "3/10",
-                "archetype": "Neutral",
-                "bias": "formal",
-                "student": "qwen:latest",
-                "teacher": "mistral:7b-instruct-q4_K_M",
-                "layer0_classification": "VALID",
-                "layer1_echo_detected": False,
-                "semantic_overlap": 0.15,
-                "layer2_checked": False,
-                "layer2_predicted_label": None,
-                "layer2_contradiction_score": np.nan,
-                "v_ok": True,
-                "v_confidence": 0.87,
-                "rag_enabled": False,
-            }
-        ]
-    )
-    row = _build_failure_mode_rows(df)[0]
-    assert row["reached_layer1"] is True
-    assert row["layer1_result"] == "CLEAN"
-    assert row["reached_layer2"] is False
-    assert row["reached_judge"] is True
-    assert row["judge_result"] == "PASS"
-    assert row["teacher"] == "mistral:7b-instruct-q4_K_M"
-
-
-def test_build_rows_parses_real_rag_chunks_only_when_rag_enabled():
-    df = pd.DataFrame(
-        [
-            {
-                "run_id": "run-a",
-                "step": "4/10",
-                "archetype": "Neutral",
-                "bias": "formal",
-                "student": "qwen:latest",
-                "teacher": "qwen:latest",
-                "layer0_classification": "VALID",
-                "layer1_echo_detected": False,
-                "v_ok": True,
-                "v_confidence": 0.9,
-                "rag_enabled": True,
-                "rag_context": "[baseline | Behavior]\ntext here",
-            }
-        ]
-    )
-    row = _build_failure_mode_rows(df)[0]
-    assert row["chunks"] == [{"archetype": "baseline", "category": "Behavior"}]
-
-    df.loc[0, "rag_enabled"] = False
-    row2 = _build_failure_mode_rows(df)[0]
-    assert row2["chunks"] == []
-
-
-def test_sync_failure_mode_graph_button_sends_the_bootstrap_and_the_unwind_sync(monkeypatch):
-    """The new "Sync failure-mode graph" button (distinct from the original "Sync history to
-    Neo4j" button, which only ever wrote the plain Archetype-Bias co-occurrence graph) sends two
-    real Cypher statements: the one-time CascadeStage/PRECEDES bootstrap, then the per-response
-    UNWIND/MERGE sync carrying the resolved cascade-lineage rows."""
-    fake_graph = _FakeGraph()
-    at = _run_and_click(monkeypatch, fake_graph, button_label="Sync failure-mode graph")
-
-    queries = [c["query"] for c in fake_graph.calls]
-    assert any("MERGE (s0:CascadeStage" in q and "PRECEDES" in q for q in queries)
-    sync_call = next(c for c in fake_graph.calls if "UNWIND $rows AS row" in c["query"] and "Response" in c["query"])
-    assert "MERGE (resp:Response {response_id: row.response_id})" in sync_call["query"]
-    assert "REACHED" in sync_call["query"]
-    assert len(sync_call["params"]["rows"]) == 2  # _sample_df() has 2 rows
     assert not at.exception

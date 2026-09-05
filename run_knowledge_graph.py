@@ -9,9 +9,14 @@ Streamlit entry point going forward; ``streamlit_app.py`` itself moved to
 ``legacy/streamlit_app.py`` (kept for reference, no longer the way to run
 anything -- see ``legacy/README.md``).
 
-Per CLAUDE.md's constraint 1, the Neo4j subsystem is reused exactly as-is,
-untouched: ``core/service/neo4j_service.py``, ``utils/other/neo4j_services.py``,
-and ``core/tabs/knowledge_graph.py`` are imported, not modified.
+Per CLAUDE.md's constraint 1, the Neo4j subsystem stays untouched:
+``core/service/neo4j_service.py``, ``utils/other/neo4j_services.py``, and
+``core/tabs/knowledge_graph.py`` are imported, not modified -- with one exception, 2026-09-05: the
+failure-mode/cascade-lineage graph and its 3 root-cause queries were promoted out of
+``core/tabs/knowledge_graph.py`` into the layered FastAPI architecture (``/knowledge_graph``, see
+``core/adapters/neo4j_repo.py``). What's left in ``core/tabs/knowledge_graph.py`` -- the PageRank
+scripts, the plain Archetype/Bias sync, Hypothesis Testing, Uncertainty Analysis -- is exactly as
+untouched as before.
 
 Unlike the legacy tab (which read ``st.session_state.history``, populated
 by ``tab_gen``'s live in-session generation), this script has no generation
@@ -35,12 +40,14 @@ from utils.other.neo4j_services import start_neo4j
 st.set_page_config(page_title="nn_lab -- Knowledge Graph", layout="wide")
 start_neo4j()
 
-st.title("🕸️ Knowledge Graph (Neo4j)")
+st.title("Knowledge Graph (Neo4j)")
 st.caption(
-    "Standalone Neo4j graph explorer. Every other tab has moved to the FastAPI app "
-    "(`uvicorn api.app:app --reload`) or the CLI (`python -m cli.run_experiment`) -- "
-    "this page exists purely because tab_knowledge_graph stays on Neo4j, out of scope "
-    "for the rewrite (CLAUDE.md constraint 1)."
+    "Standalone Neo4j graph explorer -- PageRank scripts, the plain Archetype/Bias sync, "
+    "Hypothesis Testing, and Uncertainty Analysis only. The failure-mode/cascade-lineage graph "
+    "and its root-cause queries moved to the FastAPI app's /knowledge_graph page (2026-09-05); "
+    "every other tab has moved to the FastAPI app (`uvicorn api.app:app --reload`) or the CLI "
+    "(`python -m cli.run_experiment`) -- this page exists purely because what's left here stays "
+    "on Neo4j, out of scope for the rewrite (CLAUDE.md constraint 1)."
 )
 
 repository = JSONLStore()
@@ -57,9 +64,4 @@ else:
 
     responses = repository.load_responses(selected_run_id)
     df = pd.json_normalize(responses)
-    # Response records don't carry their own run_id (JSONLStore keys runs by filename, not by a
-    # field on each row) -- the 2026-09-05 failure-mode-graph addition needs it (for the Response
-    # node's response_id and the :IN_RUN relationship), so it's added here, at the one place that
-    # already knows which run was selected, rather than threading it through JSONLStore itself.
-    df["run_id"] = selected_run_id
     KnowledgeGraph.knowledge_graph_tab(df)

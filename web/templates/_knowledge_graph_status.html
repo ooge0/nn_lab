@@ -1,0 +1,5 @@
+{% if error %}
+<p class="error">{{ error }}</p>
+{% elif message %}
+<p class="status-badge status-ok">{{ message }}</p>
+{% endif %}

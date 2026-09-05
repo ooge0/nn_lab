@@ -19,6 +19,22 @@ judge-fix exception was (SS4/SS6): the author asked for it directly, scoped tigh
 one real code bug fix, tests, and this writeup -- not a rewrite, not a move into
 ``core.domain``/``core.services``), and it's recorded here rather than silently folded in.
 
+.. admonition:: Update, 2026-09-05 (same day, later) -- Part 2 below has moved
+   :class: important
+
+   The failure-mode/cascade-lineage graph documented in Part 2 below was **promoted out of
+   ``core/tabs/knowledge_graph.py`` into the layered FastAPI architecture** the same day, by a
+   second, explicit author decision -- a real reversal for that one capability, not another narrow
+   exception. It now lives at :class:`core.domain.interfaces.GraphRepository` +
+   :class:`core.adapters.neo4j_repo.Neo4jGraphRepo` + ``api/routers/knowledge_graph.py``, reachable
+   at the FastAPI app's real ``/knowledge_graph`` page. Part 2's Cypher/schema/findings below are
+   still accurate (nothing was redesigned, only moved -- see ``core/adapters/neo4j_repo.py``'s own
+   docstring for the one real change, an explicit ``run_id`` parameter instead of a DataFrame
+   column), but the *code paths and screenshots* referencing the Streamlit "Root Cause" tab
+   describe a tab that no longer exists. Part 1 (the PageRank fix) is unaffected -- PageRank, the
+   plain Archetype/Bias sync, Hypothesis Testing, and Uncertainty Analysis all remain on
+   ``run_knowledge_graph.py`` exactly as Part 1 describes.
+
 Root cause, found by checking the real install, not guessing
 ------------------------------------------------------------------
 

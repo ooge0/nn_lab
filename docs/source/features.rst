@@ -1005,6 +1005,28 @@ weighted leaderboard table on ``/benchmark`` and the membership/purity/fit-index
 ``/clusters`` are not included here -- they're real data tables, not charts, and are already
 covered by each page's own description above.
 
+Knowledge Graph (``/knowledge_graph``)
+--------------------------------------------
+
+Added 2026-09-05, promoted out of the legacy Neo4j subsystem (:doc:`../wiki/07-knowledge-graph-results`)
+by explicit author decision -- a real `core.domain` interface
+(:class:`~core.domain.interfaces.GraphRepository`) and adapter
+(:class:`~core.adapters.neo4j_repo.Neo4jGraphRepo`), not a thin wrapper around the Streamlit tab.
+Models the per-response cascade (Layer0/Layer1/Layer2/Judge) as an explicit lineage graph in Neo4j,
+so root-cause analysis over the accumulated corpus is a graph traversal instead of a groupby someone
+had to already think to write.
+
+A "Sync failure-mode graph" action (per selected run) plus 3 real root-cause queries, corpus-wide
+(every run ever synced, not scoped to one run): which model is most linked to Layer-1 echo
+rejections; where the cascade chain actually terminates for one archetype; which RAG knowledge
+categories precede echo rejections. Degrades to a clear inline error, not a 500, if Neo4j isn't
+reachable -- no other page in this app depends on it.
+
+**Deliberately not included here**: the original Archetype/Bias co-occurrence graph, the 4
+PageRank scripts, Hypothesis Testing, and Uncertainty Analysis all remain on the separate
+``streamlit run run_knowledge_graph.py`` entry point, untouched, per CLAUDE.md SS1 -- only the
+failure-mode graph specifically was promoted into this app.
+
 Not yet built
 ----------------
 

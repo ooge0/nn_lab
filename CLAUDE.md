@@ -22,6 +22,127 @@ it claims and that the signal is not noise — not breadth of features.
 The author is a self-taught practitioner, working solo, with limited time and no code reviewer.
 Optimize accordingly: correctness of the core over breadth of features.
 
+## primary rules
+
+# How to reduce token usage in Claude Code without losing effectiveness
+
+The point isn't to make Claude do less — it's to stop it from pulling context it doesn't need for the current task. Main levers: CLAUDE.md, `.claudeignore`, path-specific rules, narrowly scoped skills, and delegating to a forked subagent with isolated context.
+
+## 1. Explicit conditional rules in CLAUDE.md
+
+The simplest and most effective thing — write conditional instructions in the format "if task X, don't do Y" instead of vague preferences:
+
+
+### Context economy
+
+- Design/styling/CSS task — don't read logs, don't run tests, don't look at backend code unless explicitly asked.
+- Bug in a specific module — don't read the whole repo, scope to that module and its direct dependencies.
+- If the app hasn't been run this session — don't open logs or check for runtime errors, they don't exist yet.
+- Don't re-read a file already shown in this session if it hasn't changed since.
+- Before editing a large file, use Grep/Glob to find the relevant section first, don't read the whole file.
+
+
+This works because CLAUDE.md loads on every turn from the start, so these rules actually shape behavior from message one, instead of only when you remember to repeat them.
+
+## 2. .claudeignore — never load what you never need
+
+Extend what you already use for large projects:
+
+```
+node_modules/
+dist/
+build/
+*.log
+coverage/
+.next/
+__pycache__/
+*.min.js
+etc....
+```
+Anything Claude should never read in full is cheaper to exclude at the ignore level than to rely on it "just not going there."
+
+## 3. Path-specific rules — targeted instructions per zone
+
+Claude Code supports rules tied to paths (the same format nested skills use). Instead of one big "don't look at logs if it's a design task" instruction, tie behavior explicitly to a directory:
+
+```
+## frontend/**
+Don't read backend/ or check DB migrations here unless explicitly requested.
+
+## backend/**
+Don't touch frontend/styles/ or run visual tests here.
+```
+
+This is literally the mechanism behind "don't check logs if it's a design task" — just formalized so Claude understands the boundary by task type on its own, without you repeating it every time.
+
+## 4. Skills instead of repeated long prompts
+
+If you keep asking for the same thing ("check migrations", "run lint and show the diff") — wrap it in a skill instead of typing it out each time. A skill only loads into context when actually invoked, unlike CLAUDE.md which is always present. That's a direct saving: a long instruction doesn't sit in context for the whole session if it's not needed right now.
+
+```yaml
+---
+name: check-migrations
+description: Check DB migrations for conflicts
+disable-model-invocation: true
+---
+Check only files in migrations/, don't touch the rest of the code.
+```
+
+## 5. Forked subagent for "messy" work
+
+For tasks like "read the whole codebase and find where X is used" — use `context: fork` with the `Explore` agent. This isn't just convenience, it's a direct token saving: the subagent works in a separate context, finds what's needed, and only a summary comes back into your main session, not every file it touched along the way.
+
+```yaml
+---
+name: find-usage
+description: Find all usages of a function/variable in the code
+context: fork
+agent: Explore
+---
+Find every place where $ARGUMENTS is used. Return a file list and a short summary, not the full code listing.
+```
+
+Without this, Claude greps/reads files in the main session itself, and all of that accumulates permanently in conversation history (until compaction). With a fork, only the result comes back.
+
+## 6. Explicitly ask Claude not to re-read what hasn't changed
+
+One common source of waste: Claude re-reading a file "just in case" before an edit. Rule for CLAUDE.md:
+```
+Don't re-read a file if it was already shown in this session and hasn't been edited since.
+```
+
+## 7. Watch the size of CLAUDE.md and the skill list itself
+
+Paradox: if too many context-economy rules pile up, the list itself starts costing tokens (the skill listing weighs roughly 1% of the model's context window). Keep CLAUDE.md compact, move long reference material into separate files that CLAUDE.md just points to — they only load if actually needed.
+
+## Base template — drop into CLAUDE.md right now
+
+```
+## Context economy rules
+
+1. Don't read logs or check runtime state if the app hasn't been run in this session.
+2. Design/styling task — don't touch backend, DB, or tests unless explicitly asked.
+3. Before editing a large file — Grep/Glob first, then read only the relevant section.
+4. Don't re-read a file if it hasn't changed since it was last shown.
+5. For repo-wide search, use a forked Explore agent instead of reading files one by one in the main session.
+```
+
+## Senior-dev rules — the stuff people learn the hard way
+
+Not gimmicks, not micro-optimizations — habits from people who actually understand how not to overload a language model with context it doesn't need.
+
+6. Never ask Claude to "read the whole project to understand it" as a first step. State the actual entry points (main file, router, schema) up front — orientation-by-full-read is the single biggest silent token sink.
+7. Keep CLAUDE.md to facts and standing constraints only. If a paragraph explains *why* a rule exists, that belongs in a comment or doc, not in the file that loads on every single turn.
+8. One task, one topic per message. Don't bundle "also check the auth flow while you're at it" into an unrelated bugfix — mixed intent forces broader context loading than either task needs alone.
+9. Prefer diffs over full-file pastes when describing what changed. Full-file context is only worth it the first time Claude touches a file; after that, diffs carry the same information for a fraction of the tokens.
+10. Don't paste stack traces you haven't looked at yourself. A raw 200-line trace where the actual error is in the first 5 lines burns tokens for no signal — trim it before pasting, or point Claude at the file/line directly.
+11. Split "explore" and "implement" into separate turns, not one. Asking Claude to investigate and fix in one shot means every exploratory read stays in context for the fix too, even the dead ends.
+12. Close the loop on a subtask before opening a new one. Long-running sessions that jump between five half-finished tasks force Claude to keep all five in working memory instead of one at a time.
+13. Don't ask for speculative work ("also make it configurable in case we need X later") unless X is a real, near-term requirement. Every hypothetical branch Claude writes and reasons about is context spent on a feature that may never exist.
+14. Trust the model's default read granularity. The senior instinct to say "just read the whole module to be safe" is usually wrong here — scoped reads plus targeted follow-up reads are cheaper than a defensive full read, and just as correct.
+15. When a task is genuinely exploratory and you don't know the entry point yourself, say so explicitly and let Claude use Explore/fork — don't make Claude guess by dumping the whole repo tree into the prompt "just in case."
+16. Periodically prune completed threads from long sessions. A session that has accumulated ten finished tasks' worth of history is paying a compaction/re-attachment tax on all of it going forward — start a fresh session per unrelated task rather than one marathon thread.
+
 ---
 
 ## 1. Hard scope boundaries
@@ -92,6 +213,30 @@ Optimize accordingly: correctness of the core over breadth of features.
   failures). Full record: `docs/source/wiki/07-knowledge-graph-results.rst`. Same explicit
   boundaries as before: no refactor into `core.domain`, no promotion into the rewrite's own
   architecture/testing discipline.
+
+  **Fourth entry, 2026-09-05, a real reversal this time, not another narrow exception:** the
+  author explicitly decided to promote the failure-mode/cascade-lineage graph specifically (not
+  the original Archetype/Bias co-occurrence graph, not the PageRank scripts, not Hypothesis
+  Testing/Uncertainty Analysis) out of this quarantine and into the layered architecture, full
+  depth (a real `core.domain` interface + adapter, matching `LLMClient`/`Judge`/`Repository`/
+  `KnowledgeBase`), explicitly to leave room to grow toward the graph-representation-learning
+  roadmap (`docs/source/wiki/08-graph-representation-learning.rst`) without a later redesign.
+  Shipped: `core.domain.interfaces.GraphRepository` (4 methods: `sync_failure_mode_graph`,
+  `echo_rejections_by_model`, `terminal_stage_by_archetype`, `rag_chunks_linked_to_echo`),
+  `core.adapters.neo4j_repo.Neo4jGraphRepo` (Cypher ported verbatim from the Streamlit version,
+  not redesigned — reads its own `[neo4j]` config directly rather than importing the untouched
+  `Neo4jService`, keeping the new layer independent of the legacy one its one covered capability
+  was promoted out of), `api/routers/knowledge_graph.py` + `web/templates/knowledge_graph.html`
+  (a real `/knowledge_graph` page, linked from `_nav.html` under `[corpus]`). The corresponding
+  code was then **removed** from `core/tabs/knowledge_graph.py` (the "Root Cause (Failure-Mode
+  Graph)" tab it briefly carried) — verified live parity first (identical real numbers — 27 vs. 12
+  echo-rejections by model, 36 echo-rejections linked to the `paranoid`/`Behavior` RAG category —
+  through the new FastAPI page against the same live Neo4j data) before deleting the Streamlit
+  duplicate, matching the Stage-16 precedent for every other tab this project has ever retired.
+  20 tests (11 unit for the adapter, 9 integration for the router — no live server needed, mocked
+  `py2neo.Graph`). What's still on the Streamlit script (`run_knowledge_graph.py`) and still fully
+  under the original quarantine, unchanged: the plain Archetype/Bias co-occurrence sync, all 4
+  PageRank scripts, Hypothesis Testing, Uncertainty Analysis.
 - Authentication.
 - Hosted inference migration (stay on local Ollama for now).
 - Any product/marketing/"client-facing metrics" layer.
@@ -488,23 +633,26 @@ Stage 16 did cutover/cleanup). What's actually on disk today:
 
 **Primary (FastAPI rewrite):**
 - **`api/`** — FastAPI app (`app.py`) + routers (`experiments`, `runs`, `analytics`, `nlp`,
-  `clusters`, `model_evo`, `benchmark`, `monitor`, `faq`, `demo`). `api/_paths.py` centralizes
-  absolute `TEMPLATES_DIR`/`STATIC_DIR`/`REPO_ROOT`.
+  `clusters`, `model_evo`, `benchmark`, `monitor`, `faq`, `demo`, `db_export`, `api_status`,
+  `knowledge_graph`). `api/_paths.py` centralizes absolute `TEMPLATES_DIR`/`STATIC_DIR`/`REPO_ROOT`.
 - **`web/`** — Jinja2 templates + HTMX (`web/templates/`), Plotly/matplotlib chart-building
   (`web/plotting/`, one module per tab), vendored `htmx`/`plotly.min.js` (`web/static/vendor/`, no
   CDN dependency).
 - **`cli/`** — `run_experiment.py` (Stage 15's config-driven batch runner) + `example_config.toml`.
 - **`core/domain/`** — `entities.py` (pydantic models incl. `ExperimentConfig`, `RunRecord`,
   `GenerationResult`, `JudgeVerdict`) + `interfaces.py` (`LLMClient`, `Judge`, `PromptStrategy`,
-  `Repository`, `KnowledgeBase`). Zero framework imports.
+  `Repository`, `KnowledgeBase`, `GraphRepository` — the last added 2026-09-05, see §1). Zero
+  framework imports.
 - **`core/services/`** — `ExperimentRunner` (orchestration), `MetricsEngine` (Stage 7),
   `cluster_discovery.py` (Stage 10's `run_plain_hdbscan`/`run_behavioral_topology`/
   `compute_fit_indices`), `_sse.py` (the asyncio-queue bridge shared by the web app and reused
   internally by the CLI's own `asyncio.run()` wrapper).
 - **`core/adapters/`** — `OllamaClient` (native `/api/chat`, real token/timing telemetry),
-  `JSONLStore`/`SQLiteRepo` (both implement `Repository`), `NaiveJudge` (the explicit author-swap
-  boundary, CLAUDE.md §4), `NaivePromptStrategy`, `rag/` (moved here from `core/rag/` in Stage 3:
-  `chunking.py`, `ingestion.py`/`RAGEngine`, `retriever.py`, `vector_store.py`, `knowledge_base.py`).
+  `JSONLStore`/`SQLiteRepo` (both implement `Repository`), `StructuredJudge` (CLAUDE.md §4),
+  `NaivePromptStrategy`, `rag/` (moved here from `core/rag/` in Stage 3:
+  `chunking.py`, `ingestion.py`/`RAGEngine`, `retriever.py`, `vector_store.py`, `knowledge_base.py`),
+  `neo4j_repo.py`/`Neo4jGraphRepo` (implements `GraphRepository`, added 2026-09-05 — the failure-mode
+  graph, promoted out of the legacy Neo4j subsystem; see §1's fourth Neo4j entry).
 - **`core/analysis/`** — the linguistic/statistical metric implementations
   (`calculate_advanced_linguistic_metrics.py`, `nlp_science.py`, `neuro_metrics.py`,
   `model_evaluation.py`, `data_contract.py`) plus `cluster_discovery.py` (the pre-existing
@@ -516,9 +664,14 @@ Stage 16 did cutover/cleanup). What's actually on disk today:
 - **`core/service/neo4j_service.py`** and **`utils/other/neo4j_services.py`** — the Neo4j client
   and process-launcher, untouched per §1, now used by `run_knowledge_graph.py`.
 - **`core/tabs/knowledge_graph.py`** — Streamlit tab rendering for the (out-of-scope) knowledge
-  graph, untouched.
+  graph: the plain Archetype/Bias co-occurrence sync, all 4 PageRank scripts, Hypothesis Testing,
+  Uncertainty Analysis. Untouched, per §1 — the failure-mode graph this file briefly also carried
+  was promoted out to `core/adapters/neo4j_repo.py`/`api/routers/knowledge_graph.py` 2026-09-05
+  (see §1's fourth Neo4j entry) and removed from here once real parity was verified.
 - **`run_knowledge_graph.py`** (repo root) — Stage 16's small standalone script: loads a run via
-  `JSONLStore`, calls `KnowledgeGraph.knowledge_graph_tab(df)`. The only live Streamlit entry point.
+  `JSONLStore`, calls `KnowledgeGraph.knowledge_graph_tab(df)`. The only live Streamlit entry point,
+  now covering only what's still listed above (the failure-mode graph is reachable at the FastAPI
+  app's `/knowledge_graph` page instead).
 - **`legacy/streamlit_app.py`** — the original ~3,400-line monolith, moved here at Stage 16
   (`git mv`, history preserved). Reference-only; every tab besides `tab_knowledge_graph` has a
   tested FastAPI/CLI equivalent now.

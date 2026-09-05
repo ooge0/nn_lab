@@ -205,6 +205,96 @@ class KnowledgeBase(Protocol):
 
 
 @runtime_checkable
+class GraphRepository(Protocol):
+    """
+    Cascade failure-mode/lineage graph -- corpus-level root-cause analysis over an already-persisted
+    run's responses, backed by a graph database.
+
+    2026-09-05: promoted into the layered architecture from the legacy Neo4j subsystem
+    (``core/tabs/knowledge_graph.py``, CLAUDE.md SS1) by explicit author decision -- a deliberate,
+    narrow reversal of that subsystem's original "untouched, no promotion into core.domain"
+    boundary, scoped specifically to the failure-mode/cascade-lineage graph (CLAUDE.md SS1's
+    "Same exception, extended same day" entry) and NOT to the original Archetype/Bias co-occurrence
+    graph or the PageRank scripts, which remain on their existing Streamlit code path unchanged.
+
+    Shaped by, and its Cypher ported directly from, the real, already-verified queries in
+    ``core/tabs/knowledge_graph.py`` (see that module's docstring history) -- not redesigned from
+    scratch. Each method is a narrow, named root-cause question, matching this project's existing
+    interface style (:class:`Judge`, :class:`KnowledgeBase`) rather than a generic
+    "run arbitrary Cypher" escape hatch, which would leak the adapter's query language through the
+    domain boundary. Deliberately left room to grow (CLAUDE.md's own working-discipline
+    "spec follows code" rule means no placeholder methods are added here ahead of a real
+    implementation) -- see ``docs/source/wiki/08-graph-representation-learning.rst`` for named,
+    cited candidates (community detection, node similarity, link prediction) that would each become
+    one more narrow method here, not a redesign of this interface.
+    """
+
+    def sync_failure_mode_graph(self, run_id: str, responses: list[dict]) -> int:
+        """
+        Sync one run's responses into the failure-mode/cascade-lineage graph.
+
+        Idempotent (safe to call repeatedly for the same run -- e.g. re-syncing after more
+        responses land): every node/relationship is MERGEd, never blindly created.
+
+        Parameters
+        ----------
+        run_id : str
+            The run's ID (used as the ``Run`` node's key and part of each ``Response`` node's key).
+        responses : list[dict]
+            The run's persisted response records, in the shape :meth:`Repository.load_responses`
+            returns.
+
+        Returns
+        -------
+        int
+            Number of response records synced.
+        """
+        ...
+
+    def echo_rejections_by_model(self) -> list[dict]:
+        """
+        Root-cause query: which models are most linked to Layer-1 echo rejections, across every
+        archetype/bias/run synced so far (not scoped to one run -- the graph accumulates).
+
+        Returns
+        -------
+        list[dict]
+            ``{"model", "echo_count"}`` rows, ordered by ``echo_count`` descending.
+        """
+        ...
+
+    def terminal_stage_by_archetype(self, archetype: str) -> list[dict]:
+        """
+        Root-cause query: for one archetype, where does the cascade chain actually terminate --
+        Layer 0 rejection, Layer 1 echo, Layer 2's independent check, or a real Judge verdict.
+
+        Parameters
+        ----------
+        archetype : str
+            The archetype to inspect.
+
+        Returns
+        -------
+        list[dict]
+            ``{"terminal_stage", "terminal_result", "n"}`` rows, ordered by ``n`` descending.
+        """
+        ...
+
+    def rag_chunks_linked_to_echo(self) -> list[dict]:
+        """
+        Root-cause query: which RAG-retrieved knowledge categories are upstream of Layer-1 echo
+        failures.
+
+        Returns
+        -------
+        list[dict]
+            ``{"chunk_archetype", "chunk_category", "echo_count"}`` rows, ordered by
+            ``echo_count`` descending.
+        """
+        ...
+
+
+@runtime_checkable
 class Repository(Protocol):
     """
     Persists run metadata and per-response records.
@@ -290,4 +380,4 @@ class Repository(Protocol):
         ...
 
 
-__all__ = ["LLMClient", "Judge", "PromptStrategy", "KnowledgeBase", "Repository"]
+__all__ = ["LLMClient", "Judge", "PromptStrategy", "KnowledgeBase", "GraphRepository", "Repository"]
