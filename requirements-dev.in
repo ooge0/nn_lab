@@ -1,0 +1,18 @@
+-r requirements.in
+
+# Dev tools
+mypy
+ruff
+black
+pytest
+pytest-cov
+allure-pytest
+pyvis
+tox
+
+# E2E (CLAUDE.md SS7's Playwright layer -- Stage 16+ addition, /experiments coverage)
+pytest-playwright
+
+# Type stubs (only those that exist!)
+types-PyYAML
+scikit-learn-stubs

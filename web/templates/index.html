@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>
+  (function(){
+    try {
+      var theme = localStorage.getItem("nn_lab_theme") === "light" ? "light" : "dark";
+      if (theme === "light") {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+      // Keeps the server-side cookie (read by web/plotting/render.py for chart theming)
+      // in sync with localStorage on every load, not just on a toggle click -- so a
+      // preference set before this cookie mirroring existed still self-heals.
+      document.cookie = "nn_lab_theme=" + theme + "; path=/; max-age=31536000; samesite=lax";
+      if (localStorage.getItem("nn_lab_sidebar_collapsed") === "1") {
+        document.documentElement.classList.add("sidebar-collapsed");
+      }
+    } catch (e) {}
+  })();
+  </script>
+  <title>nn_lab</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/vendor/htmx/htmx.min.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  {% include "_nav.html" %}
+  <main>
+  <h1>nn_lab</h1>
+  <p>Psycho-Data-Augmentor -- FastAPI rewrite (see CLAUDE.md / the Sphinx docs for the full picture).</p>
+
+  <ul>
+    <li><a href="/experiments">Run an experiment</a> -- full <code>tab_gen</code> parity: judge, prompt mode, sweep, RAG.</li>
+    <li><a href="/runs">Run summaries</a> -- read-only aggregation over a completed run's persisted responses.</li>
+    <li><a href="/analytics">Analytics</a> -- adherence, high-dim, and Zipf-deviation charts over a completed run.</li>
+    <li><a href="/nlp">Deep NLP investigation</a> -- POS morphology, cognitive/emotional, and neuropsychological charts.</li>
+    <li><a href="/clusters">Multi-dimensional analysis</a> -- K-Means/PCA, HDBSCAN, and UMAP+HDBSCAN behavioral topology.</li>
+    <li><a href="/model_evo">Model evaluation</a> -- baseline logistic-regression fit predicting a chosen label from the run's metrics.</li>
+    <li><a href="/benchmark">Benchmark</a> -- dataset overview, pass-rate/latency/quality charts, and a weighted model leaderboard.</li>
+    <li><a href="/faq">FAQ</a> -- user guide and metric methodology (English / Українська).</li>
+    <li><a href="/monitor">Raw data / schema</a> -- every response as a real table (all rows, not just a preview), plus column dtypes.</li>
+    <li><a href="/docs">API docs (Swagger)</a> / <a href="/redoc">API docs (ReDoc)</a> -- auto-generated from the routers.</li>
+  </ul>
+  </main>
+</div>
+</body>
+</html>

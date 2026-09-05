@@ -1,0 +1,25 @@
+{# Fragment returned by GET /runs/{run_id}/summary, swapped into #perf-summary. #}
+<div id="perf-summary">
+  {% if summary is none %}
+  <p>No responses found for run <code>{{ selected_run_id }}</code>.</p>
+  {% else %}
+  <table class="kv-table">
+    <tbody>
+      <tr><th>Total records</th><td class="num">{{ summary.total_records }}</td></tr>
+      <tr><th>Steps</th><td class="num">{{ summary.total_steps }}</td></tr>
+      <tr><th>Sweep parameter</th><td>{{ summary.sweep_param }}</td></tr>
+      <tr><th>Value range</th><td>{{ summary.sweep_range }}</td></tr>
+      <tr><th>Total processing time</th><td class="num">{{ summary.total_duration_sec }} sec</td></tr>
+      <tr><th>Avg. ms per word</th><td class="num">{{ summary.avg_ms_per_word if summary.avg_ms_per_word is not none else "N/A" }}</td></tr>
+      <tr><th>Avg. validation time</th><td class="num">{{ summary.avg_validation_sec if summary.avg_validation_sec is not none else "N/A" }} sec</td></tr>
+      <tr><th>Teacher(s)</th><td>{{ summary.teachers | join(", ") }}</td></tr>
+      <tr><th>Student(s)</th><td>{{ summary.students | join(", ") }}</td></tr>
+      <tr><th>Prompt strategy</th><td>{{ summary.prompt_strategies | join(", ") }}</td></tr>
+      <tr><th>Archetypes</th><td>{{ summary.archetypes | join(", ") }}</td></tr>
+      <tr><th>Biases ({{ summary.distinct_bias_count }} distinct)</th><td>{{ summary.biases | join(", ") }}</td></tr>
+      <tr><th>RAG enabled</th><td>{{ "Yes" if summary.rag_enabled else "No" }}</td></tr>
+      <tr><th>RAG configuration mode</th><td>{{ summary.rag_modes | join(", ") if summary.rag_modes else "Disabled" }}</td></tr>
+    </tbody>
+  </table>
+  {% endif %}
+</div>

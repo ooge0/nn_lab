@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>
+  (function(){
+    try {
+      var theme = localStorage.getItem("nn_lab_theme") === "light" ? "light" : "dark";
+      if (theme === "light") {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+      // Keeps the server-side cookie (read by web/plotting/render.py for chart theming)
+      // in sync with localStorage on every load, not just on a toggle click -- so a
+      // preference set before this cookie mirroring existed still self-heals.
+      document.cookie = "nn_lab_theme=" + theme + "; path=/; max-age=31536000; samesite=lax";
+      if (localStorage.getItem("nn_lab_sidebar_collapsed") === "1") {
+        document.documentElement.classList.add("sidebar-collapsed");
+      }
+    } catch (e) {}
+  })();
+  </script>
+  <title>nn_lab -- Raw data / schema (Stage 13)</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/vendor/htmx/htmx.min.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  {% include "_nav.html" %}
+  <main>
+  <h1>Raw data / schema</h1>
+  <p>Every persisted response as a real table -- the same view the legacy Streamlit app's
+     <code>st.dataframe(df_display, ...)</code> gave you, one page here for any run. Plus column
+     dtypes, for tracing a value's real type back to source. Stage 13: scoped down from the legacy
+     <code>tab_monitor</code>/<code>tab_debug</code> pair (Ollama model management and the raw
+     session-state dump were left out; see <code>api/routers/monitor.py</code>'s module docstring
+     for why).</p>
+
+  {% if runs %}
+  <label>
+    Run
+    <select name="run_id" hx-get="/monitor/schema" hx-trigger="change" hx-target="#monitor-schema" hx-swap="outerHTML" hx-indicator="#run-picker-spinner">
+      {% for run in runs %}
+      <option value="{{ run.run_id }}" {% if run.run_id == selected_run_id %}selected{% endif %}>
+        {{ run.run_id }} ({{ run.started_at }}, {{ run.total_tasks }} tasks)
+      </option>
+      {% endfor %}
+    </select>
+    <span id="run-picker-spinner" class="htmx-indicator spinner" aria-hidden="true"></span>
+  </label>
+  {% include "_monitor_schema.html" %}
+  {% else %}
+  <p>No experiment runs found yet. Run one first via <a href="/experiments">/experiments</a>.</p>
+  {% endif %}
+  </main>
+</div>
+</body>
+</html>

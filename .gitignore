@@ -1,35 +1,30 @@
-# Created by .ignore support plugin (hsz.mobi)
-### Python template
-
-# Distribution / packaging
-.Python
-env/
-
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Sphinx documentation
-docs/_build/
-
-# pyenv
-.python-version
-
-# dotenv
-.env
-
-
-### VirtualEnv template
-# Virtualenv
-
+### VirtualEnv
 .venv
+
 
 # idea folder, uncomment if you don't need it
 .idea
 
+
+# Sphinx build output (docs/source/*.rst and conf.py stay tracked)
+docs/build/
+docs/source/_build/
+docs/.tools/
+
 #other dirs
-scr/promt_evaluation_guide/logs
-scr/promt_evaluation_guide/results
-/scr/NLP/psycho_data_augmentor/results/
-/scr/NLP/psycho_data_augmentor/logs/
+
+/.pytest_cache
+/logs/
+/results/
+__pycache__/
+*.pyc
+/config.ini
+/.tox/
+# Only the real secret is excluded -- config.ini.example, config.toml (Streamlit server settings,
+# no secrets), and config/lib/ (vendored JS for the Neo4j knowledge-graph viewer) must stay
+# tracked, or a fresh clone silently can't run either the main app or the KG explorer. Confirmed
+# real: the previous blanket `/config/` rule was hiding all of these, not just config.ini.
+/config/config.ini
+/lib/
+.venv.old-bak/
+.coverage

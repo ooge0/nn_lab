@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>
+  (function(){
+    try {
+      var theme = localStorage.getItem("nn_lab_theme") === "light" ? "light" : "dark";
+      if (theme === "light") {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+      document.cookie = "nn_lab_theme=" + theme + "; path=/; max-age=31536000; samesite=lax";
+      if (localStorage.getItem("nn_lab_sidebar_collapsed") === "1") {
+        document.documentElement.classList.add("sidebar-collapsed");
+      }
+    } catch (e) {}
+  })();
+  </script>
+  <title>nn_lab -- API status</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="app-shell">
+  {% include "_nav.html" %}
+  <main>
+  <h1>API status</h1>
+  <p>
+    Every safe (read-only) route in the app, called live just now, right here -- not a static
+    list. Reload this page any time instead of clicking through the nav one page at a time.
+    {% if all_checked_ok %}
+    <span class="status-badge status-ok">All checked routes OK</span>
+    {% else %}
+    <span class="status-badge status-fail">One or more routes failed -- see below</span>
+    {% endif %}
+  </p>
+
+  <h2>Frontend pages</h2>
+  <table>
+    <thead>
+      <tr><th>Page</th><th>Path</th><th>Status</th><th>Time</th></tr>
+    </thead>
+    <tbody>
+      {% for r in frontend_results %}
+      <tr>
+        <td>{{ r.label }}</td>
+        <td><code>{{ r.path }}</code></td>
+        <td>
+          {% if r.ok %}
+          <span class="status-badge status-ok">{{ r.status_code }} OK</span>
+          {% else %}
+          <span class="status-badge status-fail" title="{{ r.detail }}">{{ r.status_code or "ERROR" }}{{ " -- " ~ r.detail if r.detail else "" }}</span>
+          {% endif %}
+        </td>
+        <td>{{ r.elapsed_ms }} ms</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Backend / API routes</h2>
+  <p class="hint">
+    {% if latest_run_id %}
+    Routes needing a <code>run_id</code> were checked against the most recently started run,
+    <code>{{ latest_run_id }}</code>.
+    {% else %}
+    No runs exist yet -- routes needing a <code>run_id</code> are skipped, not guessed at with a
+    fake one.
+    {% endif %}
+  </p>
+  <table>
+    <thead>
+      <tr><th>Route</th><th>Path</th><th>Status</th><th>Time</th></tr>
+    </thead>
+    <tbody>
+      {% for r in backend_results %}
+      <tr>
+        <td>{{ r.label }}</td>
+        <td><code>{{ r.path }}</code></td>
+        <td>
+          {% if not r.checked %}
+          <span class="status-badge">{{ r.detail }}</span>
+          {% elif r.ok %}
+          <span class="status-badge status-ok">{{ r.status_code }} OK</span>
+          {% else %}
+          <span class="status-badge status-fail" title="{{ r.detail }}">{{ r.status_code or "ERROR" }}{{ " -- " ~ r.detail if r.detail else "" }}</span>
+          {% endif %}
+        </td>
+        <td>{{ r.elapsed_ms if r.checked else "--" }} {{ "ms" if r.checked else "" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Not fired (side-effecting or streaming)</h2>
+  <p class="hint">
+    These routes have real side effects (starting a run, writing to the database) or are
+    Server-Sent Events streams that never terminate -- this page lists them rather than calling
+    them, so checking whether the app is healthy can never itself start a real generation run or
+    duplicate a database export.
+  </p>
+  <table>
+    <thead>
+      <tr><th>Route</th><th>Method</th><th>Path</th><th>Why it isn't fired here</th></tr>
+    </thead>
+    <tbody>
+      {% for r in not_fired %}
+      <tr>
+        <td>{{ r.label }}</td>
+        <td><code>{{ r.method }}</code></td>
+        <td><code>{{ r.path }}</code></td>
+        <td>{{ r.reason }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </main>
+</div>
+</body>
+</html>

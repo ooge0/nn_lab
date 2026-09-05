@@ -1,0 +1,67 @@
+nltk>=3.9.1
+textblob>=0.18.0
+numpy>=1.26.0
+pandas>=2.2.0
+pandas-stubs>=3.0.3.260530
+hdbscan>=0.8.33
+scikit-learn>=1.4.0
+matplotlib>=3.10.9
+# Docs tag-cloud generator (utils/generate_tag_cloud.py, added 2026-08-24) -- already depends on
+# matplotlib above for rendering, this is the only new package it needs.
+wordcloud>=1.9.3
+umap-learn>=0.5.12
+plotly>=5.20.0
+streamlit>=1.33.0
+fastapi>=0.135.0
+uvicorn>=0.48.0
+jinja2>=3.1.6
+# Was already resolved transitively via myst-parser (docs build only); pinned directly since
+# Stage 14's /faq page now imports it at runtime to render faq_eng.md/faq_ua.md to HTML.
+markdown-it-py>=3.0.0
+sqlalchemy>=2.0.0
+openai>=1.30.0
+ollama>=0.3.0
+faiss-cpu>=1.7.4
+# Pinned exactly (not >=) so `pip-compile`/`pip install -r requirements-base.txt`
+# never drifts past what the cu121 index (see README's Windows install step)
+# actually serves -- a floating constraint here previously let the resolver
+# pick a newer default-PyPI-only torch that silently clobbered the CUDA build.
+# Bump both together, and confirm the new version exists on the cu121 index,
+# before changing these.
+torch==2.5.1
+torchvision==0.20.1
+sentence-transformers>=3.0.0
+# spaCy/TextDescriptives (added 2026-08-24): dependency-distance-based syntactic complexity
+# (core/analysis/syntactic_complexity.py). CLAUDE.md SS7 named both as preferred, validated
+# libraries from the start but neither had actually been wired into any code until this feature.
+spacy>=3.8.0
+textdescriptives>=2.8.0
+loguru>=0.7.2
+python-Levenshtein>=0.25.0
+pytest>=9.0.3
+faker>=40.15.0
+pylint>=4.0.5
+seaborn
+py2neo>=2021.2.4
+pyvis>=0.3.2
+scipy-stubs>=1.17.1.5
+sphinx>=7.1.2,<8.0.0
+sphinx-autodoc-typehints==1.25.2
+sphinx-rtd-theme==2.0.0
+sphinxcontrib-napoleon==0.7
+sphinxcontrib-applehelp==1.0.4
+sphinxcontrib-devhelp==1.0.2
+sphinxcontrib-htmlhelp==2.0.1
+sphinxcontrib-jsmath==1.0.1
+sphinxcontrib-qthelp==1.0.3
+sphinxcontrib-serializinghtml==1.1.9
+myst-parser==2.0.0
+furo>=2024.8.6
+sphinxcontrib-plantuml>=0.31
+pytest-html>=4.2.0
+
+
+# Linux-specific deep learning stack (Ignored automatically by pip-compile on Windows)
+triton==3.7.0; sys_platform == 'linux'
+nvidia-nccl-cu13==2.29.7; sys_platform == 'linux'
+nvidia-nvshmem-cu13==3.4.5; sys_platform == 'linux'

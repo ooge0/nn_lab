@@ -1,0 +1,45 @@
+{# Sidebar nav -- the per-response/corpus-level split (CLAUDE.md SS3a/SS3b) is encoded directly in
+   the nav via [req]/[corpus]/[sys] tag-prefixes, continuing the JSONL/terminal vocabulary this app
+   already uses elsewhere. Included at the top of every real page except /demo (throwaway Stage-1
+   scaffolding, not part of the navigable app -- see demo.html's own docstring). #}
+<nav class="sidebar">
+  <div class="sidebar-top">
+    <div class="sidebar-brand"><a href="/">nn_lab</a></div>
+    <div class="sidebar-icon-row">
+      <button type="button" id="theme-toggle-btn" title="Switch to light theme" aria-label="Switch to light theme">&#9680;</button>
+      <button type="button" id="sidebar-collapse-btn" title="Hide sidebar" aria-label="Hide sidebar">&#171;</button>
+    </div>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-label">[req]</div>
+    <a href="/experiments">Generation</a>
+    <a href="/runs">Performance</a>
+    <a href="/model_evo">Model Evaluation</a>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-label">[corpus]</div>
+    <a href="/analytics">Analytics</a>
+    <a href="/nlp">NLP Science</a>
+    <a href="/clusters">Clustering</a>
+    <a href="/benchmark">Benchmark</a>
+    <a href="/knowledge_graph">Knowledge Graph</a>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-label">[sys]</div>
+    <a href="/monitor">System Monitor</a>
+    <a href="/db_export">Export to DB</a>
+    <a href="/api_status">API Status</a>
+    <a href="/faq">FAQ</a>
+  </div>
+
+  {# Moved here from being /experiments-only, 2026-08-24, so "is Ollama/NLTK/spaCy actually up" is
+     visible on every page, not just before clicking Run. #}
+  <div hx-get="/status/widget" hx-trigger="load" hx-swap="outerHTML">
+    <div id="service-status" class="status-widget"><span class="status-badge">Checking service status...</span></div>
+  </div>
+</nav>
+<button type="button" class="sidebar-expand-btn" id="sidebar-expand-btn" title="Show sidebar" aria-label="Show sidebar">&#187;</button>
+<script src="/static/ui.js" defer></script>

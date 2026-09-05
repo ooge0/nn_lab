@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>
+  (function(){
+    try {
+      var theme = localStorage.getItem("nn_lab_theme") === "light" ? "light" : "dark";
+      if (theme === "light") {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+      // Keeps the server-side cookie (read by web/plotting/render.py for chart theming)
+      // in sync with localStorage on every load, not just on a toggle click -- so a
+      // preference set before this cookie mirroring existed still self-heals.
+      document.cookie = "nn_lab_theme=" + theme + "; path=/; max-age=31536000; samesite=lax";
+      if (localStorage.getItem("nn_lab_sidebar_collapsed") === "1") {
+        document.documentElement.classList.add("sidebar-collapsed");
+      }
+    } catch (e) {}
+  })();
+  </script>
+  <title>nn_lab -- FAQ (Stage 14)</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/vendor/htmx/htmx.min.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  {% include "_nav.html" %}
+  <main>
+  <h1>User guide &amp; metric methodology</h1>
+
+  <label>
+    Select language
+    {% for option in languages %}
+    <a href="/faq?lang={{ option | urlencode }}"
+       style="{% if option == lang %}font-weight: bold; text-decoration: underline;{% endif %} margin-right: 1em;">
+      {{ option }}
+    </a>
+    {% endfor %}
+  </label>
+
+  {% if error %}
+  <p>{{ error }}</p>
+  {% else %}
+  <div>{{ content_html | safe }}</div>
+  {% endif %}
+  </main>
+</div>
+</body>
+</html>

@@ -1,13 +1,13 @@
 import subprocess
-import os
 import sys
 import platform
 import webbrowser
 from pathlib import Path
 
-# --- PATH RESOLUTION ---
-# Path logic remains cross-platform thanks to pathlib
+# --- Path setup ---
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
 CORE_DIR = PROJECT_ROOT / "core"
 DOCS_DIR = PROJECT_ROOT / "docs"
 DIAGRAMS_DIR = DOCS_DIR / "_static" / "diagrams"
@@ -24,12 +24,7 @@ class SphinxHelper:
         print(f"🚀 [OS: {platform.system()}] Generating Diagrams for {project_name}...")
 
         # pyreverse prefix logic
-        cmd = [
-            "pyreverse",
-            "-o", "png",
-            "-p", project_name,
-            str(CORE_DIR)
-        ]
+        cmd = ["pyreverse", "-o", "png", "-p", project_name, str(CORE_DIR)]
 
         try:
             # We run inside the target directory so output drops there
@@ -55,7 +50,7 @@ class SphinxHelper:
         try:
             # shell=True is mandatory for .bat on Windows, optional/safe on Linux
             subprocess.run([make_cmd, builder], cwd=DOCS_DIR, check=True, shell=self.is_windows)
-            print(f"✅ Docs build complete.")
+            print("✅ Docs build complete.")
         except Exception as e:
             print(f"❌ Build failed: {e}")
 
@@ -73,6 +68,6 @@ class SphinxHelper:
 
 if __name__ == "__main__":
     helper = SphinxHelper()
-    # helper.generate_diagrams()
+    helper.generate_diagrams()
     helper.build_docs()
     helper.open_docs()

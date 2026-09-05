@@ -1,0 +1,41 @@
+{# Fragment returned by GET /runs/judging_comparison, swapped into #judging-comparison. #}
+<div id="judging-comparison">
+  {% if error %}
+  <p>{{ error }}</p>
+  {% else %}
+  <table class="kv-table">
+    <thead>
+      <tr><th></th><th>Run A</th><th>Run B</th></tr>
+    </thead>
+    <tbody>
+      <tr><th>Run ID</th><td><code>{{ comparison.run_a.run_id }}</code></td><td><code>{{ comparison.run_b.run_id }}</code></td></tr>
+      <tr>
+        <th>Judging mode</th>
+        <td>{% if comparison.run_a.self_critic %}Self-critic (judge = student itself){% elif comparison.run_a.self_critic is sameas false %}Teacher-judged ({{ comparison.run_a.teacher_model or "unknown" }}){% else %}Unknown (no run metadata found){% endif %}</td>
+        <td>{% if comparison.run_b.self_critic %}Self-critic (judge = student itself){% elif comparison.run_b.self_critic is sameas false %}Teacher-judged ({{ comparison.run_b.teacher_model or "unknown" }}){% else %}Unknown (no run metadata found){% endif %}</td>
+      </tr>
+      <tr>
+        <th>Pass rate</th>
+        <td class="num">{{ "%.1f%%"|format(comparison.run_a.pass_rate * 100) if comparison.run_a.pass_rate is not none else "N/A" }}</td>
+        <td class="num">{{ "%.1f%%"|format(comparison.run_b.pass_rate * 100) if comparison.run_b.pass_rate is not none else "N/A" }}</td>
+      </tr>
+      <tr>
+        <th>Samples (clean / total)</th>
+        <td class="num">{{ comparison.run_a.clean_samples }} / {{ comparison.run_a.total_samples }}</td>
+        <td class="num">{{ comparison.run_b.clean_samples }} / {{ comparison.run_b.total_samples }}</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>Delta (A - B):</strong>
+    {{ "%+.1f"|format(comparison.delta * 100) ~ " pp" if comparison.delta is not none else "N/A (one or both runs have no responses with computed metrics)" }}
+  </p>
+  <p class="hint">
+    This is a diagnostic, not a verdict: neither run's pass rate is ground truth -- both a
+    self-critic judge and a teacher judge carry their own biases (LLM-as-judge self-preference is a
+    documented phenomenon). A large delta means the self-critic run inflates its own score relative
+    to the outside judge; a small delta means the two are broadly consistent for this model. Only a
+    human spot-check can say which one is actually closer to correct.
+  </p>
+  {% endif %}
+</div>

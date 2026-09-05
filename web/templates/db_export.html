@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>
+  (function(){
+    try {
+      var theme = localStorage.getItem("nn_lab_theme") === "light" ? "light" : "dark";
+      if (theme === "light") {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+      document.cookie = "nn_lab_theme=" + theme + "; path=/; max-age=31536000; samesite=lax";
+      if (localStorage.getItem("nn_lab_sidebar_collapsed") === "1") {
+        document.documentElement.classList.add("sidebar-collapsed");
+      }
+    } catch (e) {}
+  })();
+  </script>
+  <title>nn_lab -- Export to database</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/vendor/htmx/htmx.min.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  {% include "_nav.html" %}
+  <main>
+  <h1>Export to database</h1>
+  <p>
+    Every run generated through the UI or CLI is stored as JSONL files by default (the live
+    <code>JSONLStore</code>). <code>SQLiteRepo</code> is a second, fully-tested
+    <code>Repository</code> implementation over real SQLite tables (<code>runs</code>,
+    <code>responses</code>) -- useful for ad-hoc SQL queries (see <a href="/docs">/docs</a> or the
+    Sphinx Operations page's "Inspecting results directly" section for real example queries).
+    Sending a run here copies it into <code>results/nn_lab.db</code>; nothing about the source
+    JSONL files is touched or deleted.
+  </p>
+
+  {% if runs %}
+  <p>
+    <button type="button" id="export-selected-btn">Send selected to DB</button>
+    <span class="hint">
+      Bulk export just triggers each checked row's own action -- every row still resolves
+      independently (a fresh run exports cleanly, one already in the database shows the same
+      "already has N response(s)" + re-export choice it would on a single click).
+    </span>
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th><input type="checkbox" id="select-all-runs" aria-label="Select all runs"></th>
+        <th>Run ID</th><th>Started</th><th>Total tasks</th><th>Action</th><th>Status</th><th class="col-center">Export status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for run in runs %}
+      <tr>
+        <td><input type="checkbox" class="run-select" value="{{ run.run_id }}" data-row="{{ loop.index }}"></td>
+        <td><code>{{ run.run_id }}</code></td>
+        <td>{{ run.started_at }}</td>
+        <td class="num">{{ run.total_tasks }}</td>
+        <td>
+          <button
+            type="button"
+            id="send-to-db-btn-{{ loop.index }}"
+            hx-post="/db_export/export?run_id={{ run.run_id }}"
+            hx-target="#db-export-status-{{ loop.index }}"
+            hx-swap="innerHTML"
+            hx-indicator="#db-export-spinner-{{ loop.index }}"
+            hx-disabled-elt="this"
+          >
+            Send to DB
+            <span id="db-export-spinner-{{ loop.index }}" class="htmx-indicator spinner" aria-hidden="true"></span>
+          </button>
+        </td>
+        <td id="db-export-status-{{ loop.index }}"></td>
+        <td class="col-center">
+          {# The OOB-swappable element is this inner <span>, not the <td> itself: a bare <td> at
+             the top level of an htmx AJAX response gets mangled by the browser's own HTML
+             table-parsing rules (a <td> has no meaning outside a <table>/<tr> context), which
+             silently breaks the out-of-band replace -- confirmed live: the old and new content
+             stacked instead of one replacing the other, until a full page reload re-parsed
+             everything correctly. A <span> has no such table-context parsing rules. #}
+          <span id="db-export-sync-status-{{ run.run_id }}" class="sync-timestamp">
+            {% if sync_status.get(run.run_id) %}
+            {{ sync_status[run.run_id] }}
+            {% else %}
+            <span class="status-badge status-fail">Not synced</span>
+            {% endif %}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <script>
+  (function () {
+    var selectAll = document.getElementById("select-all-runs");
+    if (selectAll) {
+      selectAll.addEventListener("change", function () {
+        document.querySelectorAll(".run-select").forEach(function (cb) { cb.checked = selectAll.checked; });
+      });
+    }
+    var exportSelected = document.getElementById("export-selected-btn");
+    if (exportSelected) {
+      exportSelected.addEventListener("click", function () {
+        document.querySelectorAll(".run-select:checked").forEach(function (cb) {
+          var btn = document.getElementById("send-to-db-btn-" + cb.dataset.row);
+          // htmx.trigger fires the button's own real hx-post -- same request, same indicator/
+          // disabled-elt handling, same per-row conflict resolution as a manual single click.
+          if (btn) { htmx.trigger(btn, "click"); }
+        });
+      });
+    }
+  })();
+  </script>
+  {% else %}
+  <p>No experiment runs found yet. Run one first via <a href="/experiments">/experiments</a>.</p>
+  {% endif %}
+  </main>
+</div>
+</body>
+</html>

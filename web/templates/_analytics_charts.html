@@ -1,0 +1,42 @@
+{# Fragment returned by GET /analytics/charts, swapped into #analytics-charts. #}
+<div id="analytics-charts">
+  {% if not has_data %}
+  <p>No responses found for run <code>{{ selected_run_id }}</code>.</p>
+  {% else %}
+
+  <div class="tabset">
+    <div class="tabset-nav">
+      <button type="button" class="tab-btn" data-tab="adherence">Adherence &amp; metrics</button>
+      <button type="button" class="tab-btn" data-tab="high-dim">High-Dim analytics</button>
+      <button type="button" class="tab-btn" data-tab="zipf">Zipf deviation</button>
+    </div>
+
+    <section class="tab-panel" id="adherence">
+      {% for title, chart_html in adherence_charts %}
+      {{ chart_html | safe }}
+      {% endfor %}
+    </section>
+
+    <section class="tab-panel" id="high-dim">
+      {% if high_dim_charts %}
+      {% for title, chart_html in high_dim_charts %}
+      {{ chart_html | safe }}
+      {% endfor %}
+      {% else %}
+      <p>Missing one or more of <code>lexical_density</code>, <code>ms_per_word</code>, <code>cognitive_load</code> -- skipped.</p>
+      {% endif %}
+    </section>
+
+    <section class="tab-panel" id="zipf">
+      {% if zipf_charts %}
+      {% for title, chart_html in zipf_charts %}
+      {{ chart_html | safe }}
+      {% endfor %}
+      {% else %}
+      <p>No Zipf deviation scores found in this run.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  {% endif %}
+</div>

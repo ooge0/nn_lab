@@ -1,0 +1,41 @@
+{# Fragment returned by POST /experiments/preview, swapped as innerHTML of #task-preview (the
+   outer div lives in experiments.html itself, so this fragment's root must NOT carry that id too --
+   htmx would otherwise be swapping into an element containing a duplicate-id copy of itself). #}
+<p{% if over_cap %} class="over-cap"{% endif %}>
+  <strong>Total iterations for this setup: {{ total_tasks }}</strong>
+  {% if over_cap %}
+    -- exceeds the configured cap of {{ cap }}. Reduce the grid before starting.
+  {% endif %}
+</p>
+<dl>
+  <dt>Students</dt><dd>{{ config.student_models | join(", ") if config.student_models else "(none selected)" }}</dd>
+  <dt>Archetypes</dt><dd>{{ config.archetypes | join(", ") if config.archetypes else "(none selected)" }}</dd>
+  <dt>Biases</dt><dd>{{ config.biases | join(", ") }}</dd>
+  <dt>Prompt mode</dt><dd>{{ config.prompt_mode.value }}{% if config.exclude_archetype_from_prompt %} (archetype excluded){% endif %}</dd>
+  <dt>Judge</dt>
+  <dd>
+    {% if config.self_critic %}Self-critic -- each student judges its own output
+    {% else %}Teacher: {{ config.teacher_model or "(not set -- required unless self-critic is on)" }}
+    {% endif %}
+  </dd>
+  <dt>RAG</dt>
+  <dd>
+    {% if config.rag_enabled %}Enabled -- {{ config.rag_mode }}, top-{{ config.rag_top_k }}
+    {% else %}Disabled{% endif %}
+  </dd>
+  <dt>Sampling (base)</dt>
+  <dd>
+    temperature={{ config.base_temperature }}, top_p={{ config.base_top_p }},
+    freq_penalty={{ config.base_frequency_penalty }}, presence_penalty={{ config.base_presence_penalty }}
+    {% if config.max_tokens %}, max_tokens={{ config.max_tokens }}{% endif %}
+    {% if config.seed is not none %}, seed={{ config.seed }}{% endif %}
+  </dd>
+  <dt>Sweep</dt>
+  <dd>
+    {% if config.sweep_param and sweep_values %}
+      {{ config.sweep_param }}, {{ config.sweep_steps }} step(s): {{ sweep_values | join(", ") }}
+    {% else %}
+      None -- every combination runs once at the base sampling values above
+    {% endif %}
+  </dd>
+</dl>

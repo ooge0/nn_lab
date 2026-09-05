@@ -1,0 +1,26 @@
+{# Generic result-table fragment shared by all 3 root-cause queries -- each returns a different
+   column shape (see api/routers/knowledge_graph.py), so headers/cells are derived from the actual
+   row keys/values rather than one fixed template per query. #}
+<h3>{{ title }}</h3>
+{% if rows %}
+<table>
+  <thead>
+    <tr>
+      {% for key in rows[0].keys() %}
+      <th>{{ key }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      {% for value in row.values() %}
+      <td class="{{ 'num' if value is number else '' }}">{{ value }}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="hint">No results -- sync a run into the failure-mode graph first (above).</p>
+{% endif %}

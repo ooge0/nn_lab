@@ -1,0 +1,38 @@
+{# Stage 4 of docs/source/wiki/08-graph-representation-learning.rst: Leiden community detection
+   over the failure-mode graph's Archetype/Bias/Model/CascadeOutcome nodes. Unlike
+   _knowledge_graph_table.html's 3 sibling queries (hand-picked Cypher confirming a suspected
+   pattern), this surfaces groupings nobody wrote a query for -- so it also reports the real
+   validation number (modularity) instead of just a results table, matching CLAUDE.md SS7's own
+   "report the real number even if it's unflattering" discipline. #}
+<h3>Behavioral communities (Leiden)</h3>
+{% if rows %}
+<table class="kv-table">
+  <tbody>
+    <tr><th>Communities found</th><td class="num">{{ community_count }}</td></tr>
+    <tr><th>Modularity</th><td class="num">{{ "%.4f"|format(modularity) }}</td></tr>
+  </tbody>
+</table>
+<p class="hint">
+  Modularity measures how much more densely connected each community is internally than a random
+  graph with the same degree distribution would predict -- 1.0 is a strongly separated partition,
+  values near 0 mean the communities are barely more structured than chance. This graph is small
+  (Archetype/Bias/Model/CascadeOutcome nodes only, connected via shared responses) and densely
+  interlinked, so a low score here is a real, disclosed property of the data, not a bug.
+</p>
+<table>
+  <thead>
+    <tr><th>Community</th><th>Node type</th><th>Name</th></tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td class="num">{{ row.community_id }}</td>
+      <td>{{ row.node_type }}</td>
+      <td>{{ row.name }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="hint">No results -- sync a run into the failure-mode graph first (above).</p>
+{% endif %}

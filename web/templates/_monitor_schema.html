@@ -1,0 +1,36 @@
+{# Fragment returned by GET /monitor/schema, swapped into #monitor-schema. #}
+<div id="monitor-schema">
+  {% if not has_data %}
+  <p>No responses found for run <code>{{ selected_run_id }}</code>.</p>
+  {% else %}
+  <p>{{ row_count }} rows &times; {{ column_count }} columns.</p>
+
+  <details open>
+    <summary>Current data schema</summary>
+    {{ dtypes_table | safe }}
+  </details>
+
+  <details open>
+    <summary>
+      {% if full %}All {{ row_count }} rows{% else %}Data preview (first {{ preview_rows }} of {{ row_count }} rows){% endif %}
+      -- the raw JSONL as a table, same as the legacy Streamlit app's data view
+    </summary>
+    {% if not full and row_count > preview_rows %}
+    <p>
+      <a href="#" hx-get="/monitor/schema?run_id={{ selected_run_id }}&full=true" hx-target="#monitor-schema" hx-swap="outerHTML">
+        Show all {{ row_count }} rows
+      </a>
+    </p>
+    {% elif full %}
+    <p>
+      <a href="#" hx-get="/monitor/schema?run_id={{ selected_run_id }}" hx-target="#monitor-schema" hx-swap="outerHTML">
+        Show first {{ preview_rows }} rows only
+      </a>
+    </p>
+    {% endif %}
+    <div style="overflow-x: auto;">
+      {{ preview_table | safe }}
+    </div>
+  </details>
+  {% endif %}
+</div>

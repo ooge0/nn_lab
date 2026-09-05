@@ -1,0 +1,538 @@
+/* web/static/style.css
+ *
+ * Design system: a deliberate developer-tool/"quiet UI" palette (Linear/GitHub/
+ * Vercel/Posthog/shadcn-token family), not a literal VS Code Dark+ clone and not
+ * a SaaS-gradient or glassmorphism look -- neither was wanted. Color is signal,
+ * not decor: the four functional accents (pass/fail/warning/link) are kept in
+ * the same hue families across both themes, distinct from typical syntax-
+ * highlighting hues. 4px-based spacing scale, thin dividers over boxed
+ * borders/fills, no shadows, no rounded-pill chrome, nothing animated without a
+ * functional reason.
+ */
+
+:root {
+  /* chrome -- cooler, higher-contrast neutral scale than the old literal VS Code
+     Dark+ hex values (a deliberate 2026-09 reconsideration, not a polish pass --
+     see this project's plan file for the full before/after table and rationale) */
+  --bg: #0d0e12;
+  --surface: #16171c;
+  --surface-hover: #1e2027;
+  --border: #262832;
+  --text: #e6e6e9;
+  --text-muted: #8b8d98;
+
+  /* functional accents -- color as signal, not decoration. Kept identical across
+     themes on purpose: all four are mid-tone/mid-saturation enough to stay
+     readable on both a dark and a light background, and a signal color that
+     changes hue between themes would undermine "color = signal, not decor." */
+  --pass: #6bbf7b;
+  --fail: #d9727a;
+  --warning: #d9a94f;
+  --link: #6f9bd8;
+
+  /* nav-specific -- a subtle tint distinct from --surface-hover so an active
+     sidebar link and a merely-hovered one no longer look identical (see .sidebar) */
+  --nav-active-bg: rgba(111, 155, 216, 0.10);
+  /* :focus-visible ring -- reuses --link rather than introducing a 5th accent */
+  --focus-ring: var(--link);
+
+  /* typography */
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "SF Mono", Menlo, Monaco, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+
+  /* 4px-based spacing scale (shadcn-token convention) -- replaces the ad hoc
+     rem values previously scattered through this file */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  --radius: 6px;
+}
+
+/* Light-theme counterpart -- opt-in via the theme toggle (see ui.js), not
+   prefers-color-scheme: the app was designed dark-first and stays dark by
+   default even on a light-OS-theme machine, matching CLAUDE.md's "dark is
+   the working default, light is available" framing from the author. */
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --surface: #f6f7f9;
+  --surface-hover: #eceef2;
+  --border: #dfe1e6;
+  --text: #1b1d23;
+  --text-muted: #6b6e76;
+  --nav-active-bg: rgba(60, 90, 160, 0.08);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.5;
+  margin: 0;
+  padding: var(--space-5);
+}
+
+h1 { margin-top: 0; font-size: var(--text-2xl); }
+h2 { font-size: var(--text-xl); }
+h3 { font-size: var(--text-lg); }
+h1, h2, h3 { line-height: 1.25; }
+
+/* Keyboard-navigation focus ring -- previously relied entirely on the browser
+   default outline, easy to lose against this app's very dark background. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+code, pre {
+  font-family: var(--font-mono);
+}
+code {
+  background: var(--surface);
+  padding: 0.1em 0.35em;
+  border-radius: var(--radius);
+  font-size: 0.92em;
+}
+
+/* Numeric table/metric columns -- aligned digits, not proportional-width jitter */
+.num, td.num, th.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+a { color: var(--link); }
+
+/* --- App shell: sidebar + content column --- */
+.app-shell {
+  display: flex;
+  align-items: flex-start;
+  min-height: 100vh;
+  margin: calc(-1 * var(--space-5));
+}
+main {
+  flex: 1;
+  min-width: 0;
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-8);
+}
+
+/* --- Sidebar navigation ([req]/[corpus]/[sys] grouping) --- */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 14rem;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: var(--space-5) var(--space-4);
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  overflow-y: auto;
+}
+.sidebar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-brand {
+  font-weight: 600;
+}
+.sidebar-brand a {
+  color: var(--text);
+  text-decoration: none;
+}
+.sidebar-icon-row {
+  display: flex;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+/* Borderless icon buttons -- previously bordered boxes sitting flush against
+   the unbordered brand text next to them, two different chrome languages
+   touching. Background-only affordance on hover/focus keeps them quiet. */
+.sidebar-icon-row button {
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-2);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+.sidebar-icon-row button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+  filter: none;
+}
+.nav-group {
+  margin-bottom: var(--space-6);
+}
+.nav-group-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+  letter-spacing: 0.02em;
+}
+.nav-group a {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  margin: 0 calc(-1 * var(--space-3));
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--text);
+}
+.nav-group a:hover {
+  background: var(--surface-hover);
+}
+/* Active state was previously identical to :hover (same background, only text
+   color differed) -- a real ambiguity. A left accent bar + a distinct tint
+   reads as "current page" at a glance without recoloring the link text, in
+   keeping with "color is signal, reserved for the bar" rather than decoration. */
+.nav-group a.active {
+  background: var(--nav-active-bg);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 0 var(--link);
+}
+
+/* --- Sidebar collapse (persisted client-side, see ui.js) --- */
+html.sidebar-collapsed .sidebar { display: none; }
+.sidebar-expand-btn {
+  display: none;
+  position: fixed;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: 10;
+  background: var(--surface);
+  color: var(--text-muted);
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.sidebar-expand-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+html.sidebar-collapsed .sidebar-expand-btn { display: block; }
+
+/* Legacy flat nav (demo.html only -- deliberately outside the sidebar, see its own docstring) */
+nav.flat-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0;
+}
+nav.flat-nav a {
+  color: var(--link);
+  text-decoration: none;
+  padding: 0.15rem 0.1rem;
+}
+nav.flat-nav a:hover { text-decoration: underline; }
+
+/* --- Forms --- */
+form fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.1rem 1.1rem;
+  margin: 0 0 1rem;
+}
+form legend {
+  font-weight: 600;
+  padding: 0 0.4rem;
+}
+form label {
+  display: block;
+  margin: 0.7rem 0;
+  font-weight: 500;
+}
+input, select, textarea, button {
+  font: inherit;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+/* Every real form control drops to its own line below the label text and fills
+   the column -- the label text is often longer than the control is wide
+   (e.g. "select at least one (Ctrl/Cmd-click for multiple)"), and leaving
+   inputs inline-level let long label text wrap *around* a tall <select
+   multiple> like a floated 90s-web layout instead of stacking cleanly. */
+input:not([type="checkbox"]), select, textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+}
+input[type="checkbox"] {
+  width: auto;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+}
+select[multiple] {
+  padding: 0.25rem;
+}
+select[multiple] option:checked {
+  background: var(--surface-hover) linear-gradient(0deg, var(--surface-hover) 0%, var(--surface-hover) 100%);
+  color: var(--link);
+}
+option {
+  background: var(--surface);
+  color: var(--text);
+}
+input:disabled, select:disabled {
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+label.disabled-field {
+  color: var(--text-muted);
+}
+label.inline {
+  display: flex;
+  align-items: center;
+}
+.hint {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 0.88em;
+}
+
+/* --- Grid layout for grouped fieldsets (e.g. the experiment form) --- */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.form-grid fieldset { margin: 0; }
+
+/* --- Setup summary panel (pre-run recap) --- */
+#task-preview {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  background: var(--surface);
+}
+#task-preview p.over-cap {
+  color: var(--fail);
+}
+#task-preview dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.2rem 0.75rem;
+  margin: 0.5rem 0 0;
+}
+#task-preview dt { color: var(--text-muted); }
+#task-preview dd { margin: 0; }
+
+/* Muted-label/bold-value summary tables (perf/model-evo/benchmark overview
+   reports) -- an opt-in class so a plain data table isn't affected, matching
+   #task-preview's own dt/dd treatment above for the identical visual idea
+   expressed as <table> markup instead of <dl>. */
+.kv-table th {
+  color: var(--text-muted);
+  font-weight: 400;
+  white-space: nowrap;
+  width: 1%;
+}
+.kv-table td {
+  font-weight: 600;
+}
+
+button {
+  background: var(--link);
+  color: var(--bg);
+  border-color: var(--link);
+  cursor: pointer;
+  padding: 0.5rem 1.1rem;
+  font-weight: 600;
+}
+button:hover { filter: brightness(1.15); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Lower-commitment actions (e.g. "Compare") -- every button previously carried
+   identical visual weight regardless of consequence. Bare `button` stays the
+   primary/default treatment untouched, so existing high-stakes buttons ("Run
+   experiment", "Send to DB") need no template changes. */
+.btn-secondary {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+}
+.btn-secondary:hover { filter: none; background: var(--surface-hover); }
+
+/* htmx's own convention: elements carrying .htmx-indicator are hidden until htmx adds
+   .htmx-request to them (via hx-indicator) for the duration of an in-flight request -- used by
+   the "Send to DB" button (and any future action button) so a slow request shows visible progress
+   instead of looking unresponsive, distinct from hx-disabled-elt (which prevents the double-click
+   itself, not just the visual feedback). */
+.htmx-indicator { opacity: 0; display: inline-block; transition: opacity 150ms ease-in; }
+.htmx-request.htmx-indicator, .htmx-request .htmx-indicator { opacity: 1; }
+.spinner {
+  width: 0.85em;
+  height: 0.85em;
+  margin-left: 0.5rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: middle;
+  animation: nn-spin 0.6s linear infinite;
+}
+@keyframes nn-spin { to { transform: rotate(360deg); } }
+
+/* --- Tables -- thin row dividers, not a boxed grid ---
+   `border: none` also neutralizes the legacy `border="1"` presentational
+   attribute pandas' bare DataFrame.to_html() emits on the monitor/benchmark/
+   model-evo tables -- an invisible boxed-border regression that had nothing to
+   do with this stylesheet, since it comes from generated HTML, not CSS. */
+table {
+  border: none;
+  border-collapse: collapse;
+  width: 100%;
+  margin: var(--space-3) 0;
+  font-size: var(--text-sm);
+}
+th, td {
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+}
+th.col-center, td.col-center {
+  text-align: center;
+}
+tbody tr:hover {
+  background: var(--surface-hover);
+}
+thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+/* Renders the embedded newline in a formatted sync timestamp ("YYYY-MM-DD\nHH:MM:SS UTC") as a
+   real two-line break, without a <br> (Jinja2 autoescaping would render one as literal text, not
+   markup) or splitting the table cell into two rows. */
+.sync-timestamp {
+  white-space: pre-line;
+}
+th {
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+
+/* --- Progress / status --- */
+progress {
+  width: 100%;
+  height: 1.1rem;
+  accent-color: var(--link);
+}
+#experiment-progress, #demo-progress {
+  margin: 1rem 0;
+}
+
+/* --- Errors / warnings --- */
+.error, .experiment-error, .over-cap {
+  color: var(--fail);
+  border-left: 3px solid var(--fail);
+  padding: 0.5rem 0.9rem;
+  background: transparent;
+}
+.warning-text {
+  color: var(--warning);
+  border-left: 3px solid var(--warning);
+  padding: 0.5rem 0.9rem;
+}
+
+/* --- Sub-tabs (analytics, nlp, clusters) -- see web/static/tabs.js --- */
+.tabset-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.25rem;
+}
+.tab-btn {
+  font: inherit;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.5rem 1.1rem;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+.tab-btn:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+.tab-btn.active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom: 2px solid var(--link);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* --- Misc containers --- */
+details {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.9rem;
+  margin: 0.75rem 0;
+}
+summary { cursor: pointer; font-weight: 600; }
+
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.5rem 0;
+}
+
+/* --- Service status widget (Ollama/NLTK reachability, see /status) --- */
+.status-widget {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0.75rem 0 1.25rem;
+}
+.status-badge {
+  display: inline-block;
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+}
+.status-badge.status-ok {
+  color: var(--pass);
+  border-color: var(--pass);
+}
+.status-badge.status-fail {
+  color: var(--fail);
+  border-color: var(--fail);
+}

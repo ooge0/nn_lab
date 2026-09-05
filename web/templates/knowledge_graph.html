@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>
+  (function(){
+    try {
+      var theme = localStorage.getItem("nn_lab_theme") === "light" ? "light" : "dark";
+      if (theme === "light") {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+      document.cookie = "nn_lab_theme=" + theme + "; path=/; max-age=31536000; samesite=lax";
+      if (localStorage.getItem("nn_lab_sidebar_collapsed") === "1") {
+        document.documentElement.classList.add("sidebar-collapsed");
+      }
+    } catch (e) {}
+  })();
+  </script>
+  <title>nn_lab -- Knowledge Graph (Failure-Mode)</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/vendor/htmx/htmx.min.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  {% include "_nav.html" %}
+  <main>
+  <h1>Knowledge Graph -- Failure-Mode Analysis</h1>
+  <p>
+    Models the per-response cascade (Layer0/Layer1/Layer2/Judge, CLAUDE.md SS3a/SS4) as an explicit
+    lineage graph in Neo4j, so root-cause analysis is a graph traversal instead of a groupby you had
+    to already think to write. Promoted from the legacy Neo4j subsystem 2026-09-05 -- the original
+    Archetype/Bias co-occurrence graph and PageRank scripts remain on the separate
+    <code>streamlit run run_knowledge_graph.py</code> entry point. See
+    <a href="/docs">/docs</a> or the Sphinx wiki's "Knowledge Graph" pages for the full schema and
+    real captured findings.
+  </p>
+
+  {% if runs %}
+  <fieldset>
+    <legend>Sync a run into the failure-mode graph</legend>
+    <label>
+      Run
+      <select name="run_id" id="kg-run-picker">
+        {% for run in runs %}
+        <option value="{{ run.run_id }}" {% if run.run_id == selected_run_id %}selected{% endif %}>
+          {{ run.run_id }} ({{ run.started_at }}, {{ run.total_tasks }} tasks)
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+    <button
+      type="button"
+      id="kg-sync-btn"
+      hx-post="/knowledge_graph/sync"
+      hx-include="#kg-run-picker"
+      hx-target="#kg-sync-status"
+      hx-swap="innerHTML"
+      hx-indicator="#kg-sync-spinner"
+      hx-disabled-elt="this"
+    >
+      Sync failure-mode graph
+      <span id="kg-sync-spinner" class="htmx-indicator spinner" aria-hidden="true"></span>
+    </button>
+    <div id="kg-sync-status"></div>
+  </fieldset>
+  {% else %}
+  <p>No experiment runs found yet. Run one first via <a href="/experiments">/experiments</a>.</p>
+  {% endif %}
+
+  <h2>Root-cause queries</h2>
+  <p class="hint">These run over the whole accumulated graph (every run ever synced), not just the run selected above.</p>
+
+  <fieldset>
+    <legend>Which model is most linked to echo-rejections?</legend>
+    <button type="button" hx-get="/knowledge_graph/echo_by_model" hx-target="#kg-echo-by-model" hx-swap="innerHTML"
+            hx-indicator="#kg-echo-spinner" hx-disabled-elt="this">
+      Run query
+      <span id="kg-echo-spinner" class="htmx-indicator spinner" aria-hidden="true"></span>
+    </button>
+    <div id="kg-echo-by-model"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Where does the cascade terminate for one archetype?</legend>
+    {% if archetypes %}
+    <label>
+      Archetype
+      <select name="archetype" id="kg-archetype-picker">
+        {% for a in archetypes %}
+        <option value="{{ a }}">{{ a }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="button" hx-get="/knowledge_graph/terminal_stage" hx-include="#kg-archetype-picker"
+            hx-target="#kg-terminal-stage" hx-swap="innerHTML" hx-indicator="#kg-terminal-spinner" hx-disabled-elt="this">
+      Run query
+      <span id="kg-terminal-spinner" class="htmx-indicator spinner" aria-hidden="true"></span>
+    </button>
+    {% else %}
+    <p class="hint">Select a run above with real archetype data first.</p>
+    {% endif %}
+    <div id="kg-terminal-stage"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Which RAG knowledge categories precede echo-rejections?</legend>
+    <button type="button" hx-get="/knowledge_graph/rag_chunks_echo" hx-target="#kg-rag-chunks" hx-swap="innerHTML"
+            hx-indicator="#kg-rag-spinner" hx-disabled-elt="this">
+      Run query
+      <span id="kg-rag-spinner" class="htmx-indicator spinner" aria-hidden="true"></span>
+    </button>
+    <div id="kg-rag-chunks"></div>
+  </fieldset>
+
+  <h2>Structural analysis</h2>
+  <p class="hint">
+    Uses the graph's own structure to surface groupings, not a hand-picked query -- see
+    <code>docs/source/wiki/08-graph-representation-learning.rst</code>.
+  </p>
+
+  <fieldset>
+    <legend>Behavioral communities (Leiden)</legend>
+    <button type="button" hx-get="/knowledge_graph/behavioral_communities" hx-target="#kg-communities" hx-swap="innerHTML"
+            hx-indicator="#kg-communities-spinner" hx-disabled-elt="this">
+      Run query
+      <span id="kg-communities-spinner" class="htmx-indicator spinner" aria-hidden="true"></span>
+    </button>
+    <div id="kg-communities"></div>
+  </fieldset>
+  </main>
+</div>
+</body>
+</html>
