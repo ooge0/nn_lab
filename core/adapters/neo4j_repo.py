@@ -21,6 +21,10 @@ legacy subsystem, CLAUDE.md SS1) -- reads its own Neo4j credentials directly fro
 ``config/config.ini``'s ``[neo4j]`` section rather than reusing
 ``core.service.neo4j_service.Neo4jService``, keeping this new architecture layer independent of the
 legacy one its one covered capability was promoted out of.
+
+2026-09-05, later the same day: :meth:`Neo4jGraphRepo.behavioral_communities` adds Stage 4 of
+``docs/source/wiki/08-graph-representation-learning.rst`` -- the first design-doc technique to
+graduate into real code, exactly the growth room the promotion above was for.
 """
 
 import configparser
@@ -135,6 +139,58 @@ _ROOT_CAUSE_RAG_CHUNKS_BY_ECHO_CYPHER = """
     MATCH (c:KnowledgeChunk)<-[:RETRIEVED]-(r:Response)-[:REACHED]->(:CascadeOutcome {stage:"Layer1", result:"ECHO"})
     RETURN c.archetype AS chunk_archetype, c.category AS chunk_category, count(r) AS echo_count
     ORDER BY echo_count DESC
+"""
+
+# Stage 4 of docs/source/wiki/08-graph-representation-learning.rst: structural community detection.
+# Archetype/Bias/Model/CascadeOutcome are never directly connected in the base schema -- they only
+# ever meet through a shared Response (via CONDITIONED_ON/GENERATED_BY/REACHED). This materializes
+# that shared-Response co-occurrence as a real, weighted CO_OCCURS_WITH edge (idempotent MERGE, so
+# re-running after more responses sync just refreshes the weights) -- the graph GDS actually needs
+# to embed/cluster these four node types at all. a/b are bound variables, not the anonymous-MERGE
+# pitfall documented above; id(a) < id(b) keeps one edge per pair instead of both directions.
+_MATERIALIZE_COOCCURRENCE_CYPHER = """
+    MATCH (r:Response)-[:CONDITIONED_ON|GENERATED_BY|REACHED]->(a)
+    MATCH (r)-[:CONDITIONED_ON|GENERATED_BY|REACHED]->(b)
+    WHERE id(a) < id(b)
+    WITH a, b, count(DISTINCT r) AS weight
+    MERGE (a)-[co:CO_OCCURS_WITH]->(b)
+    SET co.weight = weight
+"""
+
+_GRAPH_NAME = "behavioral-communities"
+
+# gds.graph.project's 3-arg native form -- confirmed against the live install (SHOW PROCEDURES),
+# not assumed from GDS docs alone: (graphName, nodeProjection, relationshipProjection).
+_DROP_GRAPH_IF_EXISTS_CYPHER = "CALL gds.graph.drop($graph_name, false) YIELD graphName"
+_PROJECT_GRAPH_CYPHER = """
+    CALL gds.graph.project(
+        $graph_name,
+        ['Archetype', 'Bias', 'Model', 'CascadeOutcome'],
+        {CO_OCCURS_WITH: {orientation: 'UNDIRECTED', properties: 'weight'}}
+    )
+"""
+
+# Community detection runs directly on CO_OCCURS_WITH topology/weights (Leiden's actual input,
+# real GDS procedure signature -- gds.leiden.stream does not accept a raw embedding vector, despite
+# the wiki page's original "run Leiden on the resulting embedding space" phrasing; corrected there
+# alongside this). gds.fastRP.stream is run separately over the same projection, real structural
+# embeddings available for the still-open Stage 5/6 techniques (node similarity via gds.knn, link
+# prediction) -- not consumed by Leiden itself.
+_LEIDEN_STATS_CYPHER = """
+    CALL gds.leiden.stats($graph_name, {relationshipWeightProperty: 'weight'})
+    YIELD communityCount, modularity
+    RETURN communityCount AS community_count, modularity AS modularity
+"""
+_LEIDEN_STREAM_CYPHER = """
+    CALL gds.leiden.stream($graph_name, {relationshipWeightProperty: 'weight'})
+    YIELD nodeId, communityId
+    WITH gds.util.asNode(nodeId) AS node, communityId
+    RETURN communityId AS community_id,
+           labels(node)[0] AS node_type,
+           CASE WHEN labels(node)[0] = 'CascadeOutcome'
+                THEN node.stage + ':' + node.result
+                ELSE node.name END AS name
+    ORDER BY community_id, node_type, name
 """
 
 
@@ -255,3 +311,20 @@ class Neo4jGraphRepo:
     def rag_chunks_linked_to_echo(self) -> list[dict]:
         """See :meth:`core.domain.interfaces.GraphRepository.rag_chunks_linked_to_echo`."""
         return self._get_graph().run(_ROOT_CAUSE_RAG_CHUNKS_BY_ECHO_CYPHER).data()
+
+    def behavioral_communities(self) -> dict:
+        """See :meth:`core.domain.interfaces.GraphRepository.behavioral_communities`."""
+        graph = self._get_graph()
+        graph.run(_MATERIALIZE_COOCCURRENCE_CYPHER)
+        graph.run(_DROP_GRAPH_IF_EXISTS_CYPHER, graph_name=_GRAPH_NAME)
+        graph.run(_PROJECT_GRAPH_CYPHER, graph_name=_GRAPH_NAME)
+        try:
+            stats = graph.run(_LEIDEN_STATS_CYPHER, graph_name=_GRAPH_NAME).data()[0]
+            rows = graph.run(_LEIDEN_STREAM_CYPHER, graph_name=_GRAPH_NAME).data()
+        finally:
+            graph.run(_DROP_GRAPH_IF_EXISTS_CYPHER, graph_name=_GRAPH_NAME)
+        return {
+            "modularity": stats["modularity"],
+            "community_count": stats["community_count"],
+            "rows": rows,
+        }

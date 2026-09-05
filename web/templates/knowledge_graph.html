@@ -111,6 +111,22 @@
     </button>
     <div id="kg-rag-chunks"></div>
   </fieldset>
+
+  <h2>Structural analysis</h2>
+  <p class="hint">
+    Uses the graph's own structure to surface groupings, not a hand-picked query -- see
+    <code>docs/source/wiki/08-graph-representation-learning.rst</code>.
+  </p>
+
+  <fieldset>
+    <legend>Behavioral communities (Leiden)</legend>
+    <button type="button" hx-get="/knowledge_graph/behavioral_communities" hx-target="#kg-communities" hx-swap="innerHTML"
+            hx-indicator="#kg-communities-spinner" hx-disabled-elt="this">
+      Run query
+      <span id="kg-communities-spinner" class="htmx-indicator spinner" aria-hidden="true"></span>
+    </button>
+    <div id="kg-communities"></div>
+  </fieldset>
   </main>
 </div>
 </body>

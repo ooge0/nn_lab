@@ -6,9 +6,11 @@ Wires :class:`core.adapters.neo4j_repo.Neo4jGraphRepo` (the failure-mode/cascade
 a real page + real endpoints -- promoted 2026-09-05 from the legacy Neo4j subsystem
 (``core/tabs/knowledge_graph.py``) into the layered architecture, by explicit author decision (see
 :class:`core.domain.interfaces.GraphRepository`'s own docstring for the exact scope of that
-decision). This covers only the failure-mode graph and its 3 root-cause queries -- the original
-Archetype/Bias co-occurrence graph and the PageRank scripts remain on the existing Streamlit entry
-point (``run_knowledge_graph.py``), untouched, per CLAUDE.md SS1.
+decision). This covers only the failure-mode graph, its 3 root-cause queries, and (2026-09-05,
+later the same day) Stage 4 of ``docs/source/wiki/08-graph-representation-learning.rst`` (Leiden
+community detection) -- the original Archetype/Bias co-occurrence graph and the PageRank scripts
+remain on the existing Streamlit entry point (``run_knowledge_graph.py``), untouched, per CLAUDE.md
+SS1.
 
 Every endpoint here degrades to a clear inline error rather than a raw 500 when Neo4j isn't
 reachable -- this app's other pages don't depend on Neo4j at all, and this one shouldn't take the
@@ -115,6 +117,21 @@ def rag_chunks_echo(request: Request) -> HTMLResponse:
         )
     except Exception as exc:
         logger.error(f"rag_chunks_linked_to_echo query failed: {exc}")
+        return templates.TemplateResponse(
+            request, "_knowledge_graph_status.html", {"error": f"Error running query: {exc}"}
+        )
+
+
+@router.get("/behavioral_communities", response_class=HTMLResponse)
+def behavioral_communities(request: Request) -> HTMLResponse:
+    """Stage 4 (docs/source/wiki/08-graph-representation-learning.rst): Leiden community
+    detection over Archetype/Bias/Model/CascadeOutcome, unlike the 3 root-cause queries above,
+    this surfaces structure nobody wrote a query for in advance."""
+    try:
+        result = _graph_repo.behavioral_communities()
+        return templates.TemplateResponse(request, "_knowledge_graph_communities.html", result)
+    except Exception as exc:
+        logger.error(f"behavioral_communities query failed: {exc}")
         return templates.TemplateResponse(
             request, "_knowledge_graph_status.html", {"error": f"Error running query: {exc}"}
         )

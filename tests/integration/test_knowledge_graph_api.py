@@ -29,6 +29,15 @@ class _FakeGraphRepo:
         self.echo_by_model_result = [{"model": "mistral", "echo_count": 27}, {"model": "qwen", "echo_count": 12}]
         self.terminal_stage_result = [{"terminal_stage": "Judge", "terminal_result": "PASS", "n": 47}]
         self.rag_chunks_result = [{"chunk_archetype": "paranoid", "chunk_category": "Behavior", "echo_count": 36}]
+        self.behavioral_communities_result = {
+            "modularity": 0.42,
+            "community_count": 2,
+            "rows": [
+                {"community_id": 0, "node_type": "Archetype", "name": "Detached"},
+                {"community_id": 0, "node_type": "Model", "name": "qwen:latest"},
+                {"community_id": 1, "node_type": "Archetype", "name": "Defensive"},
+            ],
+        }
         self.raise_on_query = False
 
     def sync_failure_mode_graph(self, run_id, responses):
@@ -51,6 +60,11 @@ class _FakeGraphRepo:
         if self.raise_on_query:
             raise RuntimeError("Cannot open connection to bolt://localhost:7687")
         return self.rag_chunks_result
+
+    def behavioral_communities(self):
+        if self.raise_on_query:
+            raise RuntimeError("Cannot open connection to bolt://localhost:7687")
+        return self.behavioral_communities_result
 
 
 def _make_run(run_id, started_at, total_tasks=2):
@@ -154,5 +168,19 @@ def test_rag_chunks_echo_renders_the_real_query_result(client):
 def test_query_when_neo4j_is_unreachable_shows_a_clear_error_not_a_500(client, fake_graph_repo):
     fake_graph_repo.raise_on_query = True
     response = client.get("/knowledge_graph/echo_by_model")
+    assert response.status_code == 200
+    assert "Error running query" in response.text
+
+
+def test_behavioral_communities_renders_modularity_and_the_community_rows(client):
+    response = client.get("/knowledge_graph/behavioral_communities")
+    assert response.status_code == 200
+    assert "0.4200" in response.text
+    assert "Detached" in response.text and "qwen:latest" in response.text and "Defensive" in response.text
+
+
+def test_behavioral_communities_when_neo4j_is_unreachable_shows_a_clear_error_not_a_500(client, fake_graph_repo):
+    fake_graph_repo.raise_on_query = True
+    response = client.get("/knowledge_graph/behavioral_communities")
     assert response.status_code == 200
     assert "Error running query" in response.text

@@ -1027,6 +1027,15 @@ PageRank scripts, Hypothesis Testing, and Uncertainty Analysis all remain on the
 ``streamlit run run_knowledge_graph.py`` entry point, untouched, per CLAUDE.md SS1 -- only the
 failure-mode graph specifically was promoted into this app.
 
+A 4th "structural analysis" query, added the same day: **Behavioral communities (Leiden)** --
+Stage 4 of :doc:`../wiki/08-graph-representation-learning` graduating from design doc into real
+code. Materializes a weighted co-occurrence relationship between Archetype/Bias/Model/
+CascadeOutcome nodes (they only ever meet through a shared ``Response`` in the base schema), then
+runs real Leiden community detection over that topology -- surfacing groupings nobody wrote a
+query for in advance, unlike the 3 root-cause queries above. Reports GDS's own modularity score
+alongside the results (real validation, not an eyeballed result) -- including honestly when that
+number is unflattering.
+
 Not yet built
 ----------------
 

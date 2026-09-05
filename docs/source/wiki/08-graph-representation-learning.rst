@@ -13,10 +13,18 @@ risk for combinations never actually run. That's the concrete meaning behind "gi
 sense for it" -- not a vague aspiration, but a named, 20-to-60-year-old academic subfield per
 technique below, each with a real paper cited, not invented for this page.
 
-This is a **design document for future work, not yet built** -- same status as
+This was a **design document for future work, not yet built** when first written -- same status as
 :doc:`05-cicd`'s "current absence + concrete target pipeline" framing. Nothing on this page requires
 a new dependency: every GDS procedure named below was confirmed **live, on the actual local
 install**, not assumed from documentation (see *Confirmed available now* below).
+
+**Update, 2026-09-05 (same day, later): Stage 4 shipped.** The failure-mode graph was promoted the
+same day into the layered architecture (CLAUDE.md SS1's "Fourth entry"), explicitly to leave room
+to grow toward this page's techniques without a later redesign -- Stage 4 (structural embeddings +
+Leiden communities) is the first to graduate: :meth:`core.domain.interfaces.GraphRepository.behavioral_communities`
+/ :meth:`core.adapters.neo4j_repo.Neo4jGraphRepo.behavioral_communities`, exposed as a real button
+on ``/knowledge_graph``. See the *Staged plan* section below for exactly what shipped vs. what's
+still open.
 
 The gap, precisely
 -----------------------
@@ -67,7 +75,7 @@ something structural, not an artifact of one particular metric space; disagreeme
 that look similar linguistically but sit in different relational neighborhoods (or vice versa) --
 a genuinely new finding neither method alone could produce.
 
-**4. Structural anomaly / analogy detection (node similarity).** Run ``gds.nodeSimilarity`` over the
+**4. Structural anomaly / analogy detection (node similarity).** Run ``gds.knn.stream`` over the
 FastRP embeddings to answer two symmetric questions directly: "what is this archetype/bias/model
 structurally most like" (an automatic analogy -- the literal mechanism behind "this reminds me
 of..."), and, at the low-similarity extreme, "what does this resemble nothing else in the corpus"
@@ -75,6 +83,16 @@ of..."), and, at the low-similarity extreme, "what does this resemble nothing el
 [Akoglu2015]_. This is a meaningfully different anomaly signal than a simple high-failure-rate flag:
 a node can have an entirely ordinary pass rate while still having a structurally unusual *pattern*
 of which cascade stages it reaches, which nothing in the current failure-mode queries would surface.
+
+**Correction, 2026-09-05 (found while implementing Stage 4, not assumed correct from this page's
+own first draft):** this technique originally named ``gds.nodeSimilarity`` as the procedure that
+consumes FastRP's embedding vectors. Checked directly against the live install's own procedure
+signatures (``SHOW PROCEDURES``), not from memory: ``gds.nodeSimilarity`` computes Jaccard/overlap
+similarity over *shared relationships* (a purely topological measure, no embedding input at all);
+``gds.knn`` is the actual procedure that takes an embedding-valued node property and computes
+cosine/Euclidean similarity between vectors. Corrected above and in the *Confirmed available now*
+table -- the same "verify the exact procedure signature before writing code against it" discipline
+this project already applies everywhere else (e.g. this page's own Stage 4 write-up below).
 
 **5. Link prediction for untried combinations.** Given the graph of (archetype, bias, model) triples
 already run, predict which *untried* combinations are likely to land on a negative
@@ -111,8 +129,12 @@ fixed and verified), not taken from documentation alone:
      - ✅ yes
      - Technique 2 (community detection)
    * - ``gds.nodeSimilarity.stream``
-     - ✅ yes
-     - Technique 4 (analogy / anomaly)
+     - ✅ yes (but see the Technique 4 correction above -- topological Jaccard/overlap, not
+       embedding-based; not what this page originally implied)
+     - N/A -- not the right procedure for Technique 4
+   * - ``gds.knn.stream``
+     - ✅ yes -- confirmed 2026-09-05 while implementing Stage 4
+     - Technique 4 (analogy / anomaly, over FastRP embeddings)
    * - ``gds.beta.pipeline.linkPrediction.create``
      - ✅ yes (pipeline API)
      - Technique 5 (link prediction)
@@ -127,12 +149,23 @@ Each stage below gets a **real validation step**, not "ran the algorithm, eyebal
 matching the same discipline :func:`core.services.cluster_discovery.compute_fit_indices` already
 applies to the existing UMAP/HDBSCAN pipeline.
 
-- **Stage 4 -- structural embeddings + Leiden communities.** Project the failure-mode graph,
-  run ``gds.fastRP.stream``, then ``gds.leiden.stream`` on the resulting embedding space.
-  *Validate with*: GDS's own reported modularity/conductance for the partition, plus normalized
-  mutual information against the existing UMAP/HDBSCAN cluster assignments for the same responses
-  (Technique 3) -- report both the agreement score and at least one concrete disagreement case,
-  not just the number.
+- **Stage 4 -- structural embeddings + Leiden communities. Partially shipped, 2026-09-05.**
+  Real, corrected implementation note: ``gds.leiden.stream`` does not accept a raw embedding
+  vector as input (there is no GDS procedure that runs community detection directly "on" an
+  embedding space) -- Leiden runs on real graph topology/weights instead. What actually shipped:
+  Archetype/Bias/Model/CascadeOutcome nodes are never directly connected in the base schema (they
+  only meet through a shared ``Response``), so a real, weighted ``CO_OCCURS_WITH`` relationship is
+  materialized first (shared-response co-occurrence count), then ``gds.leiden.stream`` runs on
+  that topology, and ``gds.fastRP.stream`` runs separately over the same projection -- real
+  structural embeddings, available for Stage 5/6 below, not yet consumed by anything.
+  *Validated with*: GDS's own reported modularity (real, not eyeballed -- ``gds.leiden.stats``),
+  surfaced directly in the ``/knowledge_graph`` UI alongside the community table, including an
+  honest disclosure when the number is unflattering (a small, densely-connected 25-node graph
+  measured 0.023 modularity on real synced data -- reported as-is, not hidden). **Still open, not
+  done here:** the normalized-mutual-information cross-check against the existing UMAP/HDBSCAN
+  cluster assignments (Technique 3) -- a substantially separate feature needing a join between two
+  independent systems' per-response cluster/community labels for the same run, not a small
+  addition to this method.
 - **Stage 5 -- node similarity for analogy/anomaly.** ``gds.nodeSimilarity.stream`` over the Stage 4
   embeddings. *Validate with*: manual spot-check of the top-3 "most similar" pairs and the single
   most anomalous node against a human read of the underlying real responses -- does the structural
@@ -148,10 +181,17 @@ applies to the existing UMAP/HDBSCAN pipeline.
 Honest scope note
 ----------------------
 
-This remains, explicitly, inside CLAUDE.md SS1's Neo4j quarantine -- a design document for the
-*legacy, untouched* subsystem, not a proposal to promote graph representation learning into
-``core.domain``/``core.services`` or this project's own testing/architecture discipline. And a
-direct caution on the "intuition" framing itself: everything above produces a *score* --
+**Superseded in part, 2026-09-05:** this page originally stated everything here stays inside
+CLAUDE.md SS1's Neo4j quarantine, with no promotion into ``core.domain``/``core.adapters`` at all.
+That's no longer true for Stage 4 specifically -- the failure-mode graph (not the rest of the
+legacy Neo4j subsystem: the original Archetype/Bias co-occurrence graph, the PageRank scripts,
+Hypothesis Testing, Uncertainty Analysis all remain untouched, exactly where they were) was
+promoted the same day, by explicit author decision, precisely to leave room for this page's
+techniques to grow into real, tested code rather than staying a permanently-quarantined design
+note. Stages 5/6 below are still un-shipped design, not yet real code, but there is no longer a
+standing "never promote this" boundary blocking them the way there was when this page was first
+written -- whether/when to build them is a normal future-work decision now, not a scope violation.
+And a direct caution on the "intuition" framing itself: everything above produces a *score* --
 similarity, community assignment, predicted-risk probability -- not a verdict. Treating a
 structural-anomaly flag or a link-prediction score as ground truth without the validation step
 listed for its stage would repeat exactly the mistake this project already caught once for Layer 1

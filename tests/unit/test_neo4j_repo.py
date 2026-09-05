@@ -34,6 +34,16 @@ class _FakeGraph:
             return _FakeResult([{"terminal_stage": "Judge", "terminal_result": "PASS", "n": 47}])
         if "chunk_archetype" in q:
             return _FakeResult([{"chunk_archetype": "paranoid", "chunk_category": "Behavior", "echo_count": 36}])
+        if "gds.leiden.stats" in q:
+            return _FakeResult([{"community_count": 2, "modularity": 0.42}])
+        if "gds.leiden.stream" in q:
+            return _FakeResult(
+                [
+                    {"community_id": 0, "node_type": "Archetype", "name": "Detached"},
+                    {"community_id": 0, "node_type": "Model", "name": "qwen:latest"},
+                    {"community_id": 1, "node_type": "Archetype", "name": "Defensive"},
+                ]
+            )
         return _FakeResult()
 
 
@@ -223,3 +233,73 @@ def test_rag_chunks_linked_to_echo_returns_the_real_query_shape():
     repo = Neo4jGraphRepo(graph=fake_graph)
     rows = repo.rag_chunks_linked_to_echo()
     assert rows == [{"chunk_archetype": "paranoid", "chunk_category": "Behavior", "echo_count": 36}]
+
+
+# --- behavioral_communities (Stage 4, docs/source/wiki/08-graph-representation-learning.rst) ---
+
+
+def test_behavioral_communities_returns_modularity_count_and_rows():
+    fake_graph = _FakeGraph()
+    repo = Neo4jGraphRepo(graph=fake_graph)
+
+    result = repo.behavioral_communities()
+
+    assert result["community_count"] == 2
+    assert result["modularity"] == 0.42
+    assert result["rows"] == [
+        {"community_id": 0, "node_type": "Archetype", "name": "Detached"},
+        {"community_id": 0, "node_type": "Model", "name": "qwen:latest"},
+        {"community_id": 1, "node_type": "Archetype", "name": "Defensive"},
+    ]
+
+
+def test_behavioral_communities_materializes_cooccurrence_then_projects_before_running_leiden():
+    fake_graph = _FakeGraph()
+    repo = Neo4jGraphRepo(graph=fake_graph)
+
+    repo.behavioral_communities()
+
+    queries = [c["query"] for c in fake_graph.calls]
+    assert any("CO_OCCURS_WITH" in q and "MERGE" in q for q in queries)
+    assert any("gds.graph.project" in q for q in queries)
+    cooccur_idx = next(i for i, q in enumerate(queries) if "CO_OCCURS_WITH" in q and "MERGE" in q)
+    project_idx = next(i for i, q in enumerate(queries) if "gds.graph.project" in q)
+    leiden_idx = next(i for i, q in enumerate(queries) if "gds.leiden.stats" in q)
+    assert cooccur_idx < project_idx < leiden_idx, "must materialize co-occurrence, then project, then run Leiden"
+
+
+def test_behavioral_communities_drops_the_projected_graph_both_before_and_after():
+    """Real GDS behavior: a stale in-memory graph catalog entry from a previous call would make a
+    second gds.graph.project call fail outright -- drop-if-exists must run before projecting, and
+    the projection must not leak GDS catalog memory across calls (a real, disclosed limitation --
+    see docs/source/wiki/07-knowledge-graph-results.rst), so it must also be dropped after use."""
+    fake_graph = _FakeGraph()
+    repo = Neo4jGraphRepo(graph=fake_graph)
+
+    repo.behavioral_communities()
+
+    drop_calls = [c for c in fake_graph.calls if "gds.graph.drop" in c["query"]]
+    assert len(drop_calls) == 2, "must drop before projecting (stale catalog) and after (no leaked memory)"
+    for c in drop_calls:
+        assert c["params"] == {"graph_name": "behavioral-communities"}
+
+
+def test_behavioral_communities_still_drops_the_graph_when_leiden_itself_raises():
+    class _RaisingGraph(_FakeGraph):
+        def run(self, query, **params):
+            q = " ".join(query.split())
+            if "gds.leiden.stats" in q:
+                raise RuntimeError("GDS out of memory")
+            return super().run(query, **params)
+
+    fake_graph = _RaisingGraph()
+    repo = Neo4jGraphRepo(graph=fake_graph)
+
+    try:
+        repo.behavioral_communities()
+        assert False, "expected the RuntimeError to propagate"
+    except RuntimeError:
+        pass
+
+    drop_calls = [c for c in fake_graph.calls if "gds.graph.drop" in c["query"]]
+    assert len(drop_calls) == 2, "the projected graph must still be dropped even when Leiden itself fails"

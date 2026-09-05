@@ -293,6 +293,27 @@ class GraphRepository(Protocol):
         """
         ...
 
+    def behavioral_communities(self) -> dict:
+        """
+        Structural community detection (Leiden) over the failure-mode graph's Archetype/Bias/
+        Model/CascadeOutcome nodes -- the first of the named techniques in
+        ``docs/source/wiki/08-graph-representation-learning.rst`` ("Stage 4") to graduate from
+        that design document into real code, exactly the growth room this interface was promoted
+        for. Unlike the three root-cause queries above (hand-picked Cypher confirming a suspected
+        pattern), this uses the graph's own structure to surface groupings nobody wrote a query
+        for in advance.
+
+        Returns
+        -------
+        dict
+            ``{"modularity": float, "community_count": int, "rows": list[dict]}``, where each row
+            is ``{"community_id", "node_type", "name"}``. ``modularity`` is GDS's own reported
+            score for the partition (Stage 4's real validation step, not an eyeballed result) --
+            not a normalized-mutual-information cross-check against the separate UMAP/HDBSCAN
+            corpus clustering, which is a larger, still-open follow-on (see the wiki page).
+        """
+        ...
+
 
 @runtime_checkable
 class Repository(Protocol):
