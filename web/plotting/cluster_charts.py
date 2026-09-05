@@ -27,7 +27,7 @@ import plotly.express as px
 
 from core.services.cluster_discovery import BehavioralTopologyResult
 from web.plotting.mpl_render import figure_to_img_tag
-from web.plotting.render import figure_to_div
+from web.plotting.render import QUALITATIVE_PALETTE, figure_to_div
 
 TEMPLATE = "plotly_white"
 
@@ -70,7 +70,7 @@ def build_kmeans_pca_view(df: pd.DataFrame, cluster_discovery, color_by: str = "
         hover_data=[c for c in ["archetype", "bias", "val", "v_ok"] if c in df.columns],
         title=f"PCA space: {color_by.capitalize()} distribution",
         template=TEMPLATE,
-        color_discrete_sequence=px.colors.qualitative.Vivid,
+        color_discrete_sequence=QUALITATIVE_PALETTE,
     )
     fig.update_traces(marker=dict(size=9, opacity=0.75, line=dict(width=1, color="rgba(255,255,255,0.5)")))
     fig.update_layout(height=600, legend_title_text="Legend")

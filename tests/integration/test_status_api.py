@@ -75,6 +75,11 @@ def test_status_widget_renders_a_badge_per_service_with_ok_fail_classes(client):
     assert response.status_code == 200
     assert "status-ok" in response.text
     assert "status-fail" in response.text
-    assert "Ollama" in response.text and "✅" in response.text
-    assert "NLTK" in response.text and "❌" in response.text
+    # Ties each service's own fixture detail string to its badge class, so this still
+    # proves per-service class association now that the badge carries no separate
+    # ok/fail glyph (the project disallows decorative emoji in the UI).
+    assert 'status-ok" title="3 model(s) available"' in response.text
+    assert "Ollama" in response.text
+    assert 'status-fail" title="missing: vader_lexicon"' in response.text
+    assert "NLTK" in response.text
     assert "spaCy" in response.text

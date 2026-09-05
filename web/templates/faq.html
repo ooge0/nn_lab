@@ -27,7 +27,7 @@
 <div class="app-shell">
   {% include "_nav.html" %}
   <main>
-  <h1>📚 User guide &amp; metric methodology</h1>
+  <h1>User guide &amp; metric methodology</h1>
 
   <label>
     Select language
@@ -40,7 +40,7 @@
   </label>
 
   {% if error %}
-  <p>❌ {{ error }}</p>
+  <p>{{ error }}</p>
   {% else %}
   <div>{{ content_html | safe }}</div>
   {% endif %}

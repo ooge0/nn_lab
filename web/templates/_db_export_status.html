@@ -3,7 +3,7 @@
    including the original error message -- via outerHTML, not just itself. #}
 <div id="db-export-result-{{ run_id }}">
   {% if error %}
-    <span class="status-badge status-fail" title="{{ error }}">❌ {{ error }}</span>
+    <span class="status-badge status-fail" title="{{ error }}">{{ error }}</span>
     {% if "already has" in error %}
     <button
       type="button"
@@ -19,7 +19,7 @@
     {% endif %}
   {% else %}
     <span class="status-badge status-ok">
-      ✅ {{ result.response_count }} response(s) {{ "re-" if result.overwritten else "" }}exported to {{ result.db_path }}
+      {{ result.response_count }} response(s) {{ "re-" if result.overwritten else "" }}exported to {{ result.db_path }}
     </span>
   {% endif %}
 </div>

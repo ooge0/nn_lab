@@ -33,7 +33,7 @@ is the accurate one specifically for Ollama-backed runs today.
 import pandas as pd
 import plotly.express as px
 
-from web.plotting.render import figure_to_div
+from web.plotting.render import QUALITATIVE_PALETTE, figure_to_div
 
 TEMPLATE = "plotly_white"
 
@@ -264,7 +264,10 @@ def build_high_dim_charts(df: pd.DataFrame) -> "list[tuple[str, str]]":
         df_plot,
         dimensions=["teacher", "student", "archetype", "v_ok_numeric"],
         color="archetype_id",
-        color_continuous_scale=px.colors.qualitative.Plotly,
+        # A plain hex list works as a continuous scale here (Plotly interpolates
+        # between the listed stops) -- this app's own muted palette instead of
+        # Plotly's bright default qualitative list, matching the surrounding chrome.
+        color_continuous_scale=QUALITATIVE_PALETTE,
         title="Logic pipeline | Color: Archetype",
     )
     fig0.update_layout(coloraxis_showscale=False)

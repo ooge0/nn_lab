@@ -7,37 +7,37 @@
      not enough data for a benchmark report.</p>
   {% else %}
 
-  <h3>📊 Dataset overview</h3>
-  <table>
+  <h3>Dataset overview</h3>
+  <table class="kv-table">
     <tbody>
-      <tr><th>Total samples</th><td>{{ overview.total_samples }}</td></tr>
-      <tr><th>Valid samples</th><td>{{ overview.valid_samples }}</td></tr>
-      <tr><th>Unique students</th><td>{{ overview.unique_students }}</td></tr>
-      <tr><th>Unique teachers</th><td>{{ overview.unique_teachers }}</td></tr>
+      <tr><th>Total samples</th><td class="num">{{ overview.total_samples }}</td></tr>
+      <tr><th>Valid samples</th><td class="num">{{ overview.valid_samples }}</td></tr>
+      <tr><th>Unique students</th><td class="num">{{ overview.unique_students }}</td></tr>
+      <tr><th>Unique teachers</th><td class="num">{{ overview.unique_teachers }}</td></tr>
     </tbody>
   </table>
 
-  <h3>✅ Validation success rate</h3>
+  <h3>Validation success rate</h3>
   {{ success_chart | safe }}
 
-  <h3>⚡ Performance metrics</h3>
+  <h3>Performance metrics</h3>
   {{ perf_chart | safe }}
 
   {% if quality_chart %}
-  <h3>💎 Quality metrics heatmap</h3>
+  <h3>Quality metrics heatmap</h3>
   {{ quality_chart | safe }}
   {% endif %}
 
   {% if psycho_chart %}
-  <h3>🧠 Psycholinguistic signature</h3>
+  <h3>Psycholinguistic signature</h3>
   {{ psycho_chart | safe }}
   {% endif %}
 
   {% if leaderboard_table %}
-  <h3>🏆 Model leaderboard</h3>
+  <h3>Model leaderboard</h3>
   {{ leaderboard_table | safe }}
   {% if champion %}
-  <p><strong>🥇 Champion: {{ champion }}</strong> -- top weighted score across success rate,
+  <p><strong>Champion: {{ champion }}</strong> -- top weighted score across success rate,
      coherence, and inference speed.</p>
   {% endif %}
   {% endif %}

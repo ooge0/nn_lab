@@ -93,7 +93,7 @@ def test_model_evo_targets_lists_discrete_columns_for_a_populated_run(client, fa
     response = client.get("/model_evo/targets", params={"run_id": "run-a"})
     assert response.status_code == 200
     assert "archetype" in response.text
-    assert "🚀 Run evaluation" in response.text
+    assert "Run evaluation" in response.text
 
 
 def test_model_evo_targets_for_unknown_run_returns_404_with_message(client):

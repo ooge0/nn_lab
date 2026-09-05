@@ -3,7 +3,7 @@
   {% if error %}
   <p>{{ error }}</p>
   {% else %}
-  <table>
+  <table class="kv-table">
     <thead>
       <tr><th></th><th>Run A</th><th>Run B</th></tr>
     </thead>
@@ -16,13 +16,13 @@
       </tr>
       <tr>
         <th>Pass rate</th>
-        <td>{{ "%.1f%%"|format(comparison.run_a.pass_rate * 100) if comparison.run_a.pass_rate is not none else "N/A" }}</td>
-        <td>{{ "%.1f%%"|format(comparison.run_b.pass_rate * 100) if comparison.run_b.pass_rate is not none else "N/A" }}</td>
+        <td class="num">{{ "%.1f%%"|format(comparison.run_a.pass_rate * 100) if comparison.run_a.pass_rate is not none else "N/A" }}</td>
+        <td class="num">{{ "%.1f%%"|format(comparison.run_b.pass_rate * 100) if comparison.run_b.pass_rate is not none else "N/A" }}</td>
       </tr>
       <tr>
         <th>Samples (clean / total)</th>
-        <td>{{ comparison.run_a.clean_samples }} / {{ comparison.run_a.total_samples }}</td>
-        <td>{{ comparison.run_b.clean_samples }} / {{ comparison.run_b.total_samples }}</td>
+        <td class="num">{{ comparison.run_a.clean_samples }} / {{ comparison.run_a.total_samples }}</td>
+        <td class="num">{{ comparison.run_b.clean_samples }} / {{ comparison.run_b.total_samples }}</td>
       </tr>
     </tbody>
   </table>

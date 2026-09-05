@@ -28,7 +28,7 @@
 <div class="app-shell">
   {% include "_nav.html" %}
   <main>
-  <h1>🧬 LLM evaluation</h1>
+  <h1>LLM evaluation</h1>
   <p>Stage 11: fit a baseline logistic-regression model predicting a chosen discrete column (e.g.
      <code>archetype</code>, <code>v_ok_numeric</code>) from the run's numeric metrics -- how well do
      the linguistic/neuro metrics actually predict a label.</p>
@@ -36,13 +36,14 @@
   {% if runs %}
   <label>
     Run
-    <select name="run_id" hx-get="/model_evo/targets" hx-trigger="change" hx-target="#model-evo-targets" hx-swap="outerHTML">
+    <select name="run_id" hx-get="/model_evo/targets" hx-trigger="change" hx-target="#model-evo-targets" hx-swap="outerHTML" hx-indicator="#run-picker-spinner">
       {% for run in runs %}
       <option value="{{ run.run_id }}" {% if run.run_id == selected_run_id %}selected{% endif %}>
         {{ run.run_id }} ({{ run.started_at }}, {{ run.total_tasks }} tasks)
       </option>
       {% endfor %}
     </select>
+    <span id="run-picker-spinner" class="htmx-indicator spinner" aria-hidden="true"></span>
   </label>
   {% include "_model_evo_targets.html" %}
   {% else %}

@@ -57,7 +57,7 @@
         <td><input type="checkbox" class="run-select" value="{{ run.run_id }}" data-row="{{ loop.index }}"></td>
         <td><code>{{ run.run_id }}</code></td>
         <td>{{ run.started_at }}</td>
-        <td>{{ run.total_tasks }}</td>
+        <td class="num">{{ run.total_tasks }}</td>
         <td>
           <button
             type="button"

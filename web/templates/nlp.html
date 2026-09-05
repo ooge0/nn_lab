@@ -29,20 +29,21 @@
 <div class="app-shell">
   {% include "_nav.html" %}
   <main>
-  <h1>🧪 Deep NLP investigation (NLTK)</h1>
+  <h1>Deep NLP investigation (NLTK)</h1>
   <p>Stage 9: three sub-tabs of charts over one run's persisted responses -- no new metrics, all
      presentation over data already computed by <code>PsychScientist</code>/<code>NeuroMetrics</code>.</p>
 
   {% if runs %}
   <label>
     Run
-    <select name="run_id" hx-get="/nlp/charts" hx-trigger="change" hx-target="#nlp-charts" hx-swap="outerHTML">
+    <select name="run_id" hx-get="/nlp/charts" hx-trigger="change" hx-target="#nlp-charts" hx-swap="outerHTML" hx-indicator="#run-picker-spinner">
       {% for run in runs %}
       <option value="{{ run.run_id }}" {% if run.run_id == selected_run_id %}selected{% endif %}>
         {{ run.run_id }} ({{ run.started_at }}, {{ run.total_tasks }} tasks)
       </option>
       {% endfor %}
     </select>
+    <span id="run-picker-spinner" class="htmx-indicator spinner" aria-hidden="true"></span>
   </label>
   {% include "_nlp_charts.html" %}
   {% else %}

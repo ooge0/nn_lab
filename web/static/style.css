@@ -1,65 +1,101 @@
 /* web/static/style.css
  *
- * Design system: VS Code Dark+ continuation, not a separate "product" style --
- * the user lives in this palette for multi-hour LLM-testing sessions, so the
- * app extends it rather than competing with it. Color is signal, not decor:
- * the four functional accents (pass/fail/warning/link) are deliberately
- * distinct from typical syntax-highlighting hues in an adjacent code/JSON
- * pane. Generous spacing, thin dividers over boxed borders/fills, no shadows,
- * no rounded-pill chrome, nothing animated without a functional reason.
+ * Design system: a deliberate developer-tool/"quiet UI" palette (Linear/GitHub/
+ * Vercel/Posthog/shadcn-token family), not a literal VS Code Dark+ clone and not
+ * a SaaS-gradient or glassmorphism look -- neither was wanted. Color is signal,
+ * not decor: the four functional accents (pass/fail/warning/link) are kept in
+ * the same hue families across both themes, distinct from typical syntax-
+ * highlighting hues. 4px-based spacing scale, thin dividers over boxed
+ * borders/fills, no shadows, no rounded-pill chrome, nothing animated without a
+ * functional reason.
  */
 
 :root {
-  /* chrome -- VS Code Dark+, the default theme (see body's early-init script: light is opt-in) */
-  --bg: #1e1e1e;
-  --surface: #252526;
-  --surface-hover: #2d2d2d;
-  --border: #3c3c3c;
-  --text: #d4d4d4;
-  --text-muted: #8a8a8a;
+  /* chrome -- cooler, higher-contrast neutral scale than the old literal VS Code
+     Dark+ hex values (a deliberate 2026-09 reconsideration, not a polish pass --
+     see this project's plan file for the full before/after table and rationale) */
+  --bg: #0d0e12;
+  --surface: #16171c;
+  --surface-hover: #1e2027;
+  --border: #262832;
+  --text: #e6e6e9;
+  --text-muted: #8b8d98;
 
   /* functional accents -- color as signal, not decoration. Kept identical across
      themes on purpose: all four are mid-tone/mid-saturation enough to stay
      readable on both a dark and a light background, and a signal color that
      changes hue between themes would undermine "color = signal, not decor." */
-  --pass: #7fb069;
-  --fail: #c1666b;
-  --warning: #d4a24c;
-  --link: #6c8ebf;
+  --pass: #6bbf7b;
+  --fail: #d9727a;
+  --warning: #d9a94f;
+  --link: #6f9bd8;
+
+  /* nav-specific -- a subtle tint distinct from --surface-hover so an active
+     sidebar link and a merely-hovered one no longer look identical (see .sidebar) */
+  --nav-active-bg: rgba(111, 155, 216, 0.10);
+  /* :focus-visible ring -- reuses --link rather than introducing a 5th accent */
+  --focus-ring: var(--link);
 
   /* typography */
   --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: "JetBrains Mono", Consolas, "SF Mono", Menlo, Monaco, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
 
-  --radius: 4px;
+  /* 4px-based spacing scale (shadcn-token convention) -- replaces the ad hoc
+     rem values previously scattered through this file */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  --radius: 6px;
 }
 
-/* VS Code Light+ continuation -- opt-in via the theme toggle (see ui.js), not
+/* Light-theme counterpart -- opt-in via the theme toggle (see ui.js), not
    prefers-color-scheme: the app was designed dark-first and stays dark by
    default even on a light-OS-theme machine, matching CLAUDE.md's "dark is
    the working default, light is available" framing from the author. */
 :root[data-theme="light"] {
   --bg: #ffffff;
-  --surface: #f3f3f3;
-  --surface-hover: #e8e8e8;
-  --border: #d4d4d4;
-  --text: #1e1e1e;
-  --text-muted: #6e6e6e;
+  --surface: #f6f7f9;
+  --surface-hover: #eceef2;
+  --border: #dfe1e6;
+  --text: #1b1d23;
+  --text-muted: #6b6e76;
+  --nav-active-bg: rgba(60, 90, 160, 0.08);
 }
 
 * { box-sizing: border-box; }
 
 body {
   font-family: var(--font-ui);
+  font-size: var(--text-base);
   color: var(--text);
   background: var(--bg);
   line-height: 1.5;
   margin: 0;
-  padding: 1.25rem;
+  padding: var(--space-5);
 }
 
-h1 { margin-top: 0; }
+h1 { margin-top: 0; font-size: var(--text-2xl); }
+h2 { font-size: var(--text-xl); }
+h3 { font-size: var(--text-lg); }
 h1, h2, h3 { line-height: 1.25; }
+
+/* Keyboard-navigation focus ring -- previously relied entirely on the browser
+   default outline, easy to lose against this app's very dark background. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
 
 code, pre {
   font-family: var(--font-mono);
@@ -85,14 +121,14 @@ a { color: var(--link); }
   display: flex;
   align-items: flex-start;
   min-height: 100vh;
-  margin: -1.25rem;
+  margin: calc(-1 * var(--space-5));
 }
 main {
   flex: 1;
   min-width: 0;
   max-width: 56rem;
   margin: 0 auto;
-  padding: 1.75rem 2rem;
+  padding: var(--space-6) var(--space-8);
 }
 
 /* --- Sidebar navigation ([req]/[corpus]/[sys] grouping) --- */
@@ -103,7 +139,7 @@ main {
   flex-shrink: 0;
   background: var(--surface);
   border-right: 1px solid var(--border);
-  padding: 1.25rem 1rem;
+  padding: var(--space-5) var(--space-4);
   position: sticky;
   top: 0;
   align-self: flex-start;
@@ -114,8 +150,10 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 1.25rem;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
 }
 .sidebar-brand {
   font-weight: 600;
@@ -126,14 +164,18 @@ main {
 }
 .sidebar-icon-row {
   display: flex;
-  gap: 0.3rem;
+  gap: var(--space-1);
   flex-shrink: 0;
 }
+/* Borderless icon buttons -- previously bordered boxes sitting flush against
+   the unbordered brand text next to them, two different chrome languages
+   touching. Background-only affordance on hover/focus keeps them quiet. */
 .sidebar-icon-row button {
   background: transparent;
   color: var(--text-muted);
-  border: 1px solid var(--border);
-  padding: 0.2rem 0.45rem;
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-2);
   font-size: 0.95rem;
   line-height: 1.4;
 }
@@ -143,19 +185,19 @@ main {
   filter: none;
 }
 .nav-group {
-  margin-bottom: 1.25rem;
+  margin-bottom: var(--space-6);
 }
 .nav-group-label {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   color: var(--text-muted);
-  margin-bottom: 0.35rem;
+  margin-bottom: var(--space-2);
   letter-spacing: 0.02em;
 }
 .nav-group a {
   display: block;
-  padding: 0.3rem 0.5rem;
-  margin: 0 -0.5rem;
+  padding: var(--space-2) var(--space-3);
+  margin: 0 calc(-1 * var(--space-3));
   border-radius: var(--radius);
   text-decoration: none;
   color: var(--text);
@@ -163,9 +205,15 @@ main {
 .nav-group a:hover {
   background: var(--surface-hover);
 }
+/* Active state was previously identical to :hover (same background, only text
+   color differed) -- a real ambiguity. A left accent bar + a distinct tint
+   reads as "current page" at a glance without recoloring the link text, in
+   keeping with "color is signal, reserved for the bar" rather than decoration. */
 .nav-group a.active {
-  background: var(--surface-hover);
-  color: var(--link);
+  background: var(--nav-active-bg);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 0 var(--link);
 }
 
 /* --- Sidebar collapse (persisted client-side, see ui.js) --- */
@@ -173,14 +221,14 @@ html.sidebar-collapsed .sidebar { display: none; }
 .sidebar-expand-btn {
   display: none;
   position: fixed;
-  top: 1rem;
-  left: 1rem;
+  top: var(--space-4);
+  left: var(--space-4);
   z-index: 10;
   background: var(--surface);
   color: var(--text-muted);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius);
-  padding: 0.2rem 0.5rem;
+  padding: var(--space-1) var(--space-3);
   font-size: 0.95rem;
   cursor: pointer;
 }
@@ -299,9 +347,24 @@ label.inline {
 }
 #task-preview dt { color: var(--text-muted); }
 #task-preview dd { margin: 0; }
+
+/* Muted-label/bold-value summary tables (perf/model-evo/benchmark overview
+   reports) -- an opt-in class so a plain data table isn't affected, matching
+   #task-preview's own dt/dd treatment above for the identical visual idea
+   expressed as <table> markup instead of <dl>. */
+.kv-table th {
+  color: var(--text-muted);
+  font-weight: 400;
+  white-space: nowrap;
+  width: 1%;
+}
+.kv-table td {
+  font-weight: 600;
+}
+
 button {
   background: var(--link);
-  color: #1e1e1e;
+  color: var(--bg);
   border-color: var(--link);
   cursor: pointer;
   padding: 0.5rem 1.1rem;
@@ -309,6 +372,17 @@ button {
 }
 button:hover { filter: brightness(1.15); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Lower-commitment actions (e.g. "Compare") -- every button previously carried
+   identical visual weight regardless of consequence. Bare `button` stays the
+   primary/default treatment untouched, so existing high-stakes buttons ("Run
+   experiment", "Send to DB") need no template changes. */
+.btn-secondary {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+}
+.btn-secondary:hover { filter: none; background: var(--surface-hover); }
 
 /* htmx's own convention: elements carrying .htmx-indicator are hidden until htmx adds
    .htmx-request to them (via hx-indicator) for the duration of an in-flight request -- used by
@@ -329,21 +403,35 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 @keyframes nn-spin { to { transform: rotate(360deg); } }
 
-/* --- Tables -- thin row dividers, not a boxed grid --- */
+/* --- Tables -- thin row dividers, not a boxed grid ---
+   `border: none` also neutralizes the legacy `border="1"` presentational
+   attribute pandas' bare DataFrame.to_html() emits on the monitor/benchmark/
+   model-evo tables -- an invisible boxed-border regression that had nothing to
+   do with this stylesheet, since it comes from generated HTML, not CSS. */
 table {
+  border: none;
   border-collapse: collapse;
   width: 100%;
-  margin: 0.75rem 0;
-  font-size: 0.94em;
+  margin: var(--space-3) 0;
+  font-size: var(--text-sm);
 }
 th, td {
   border: none;
   border-bottom: 1px solid var(--border);
-  padding: 0.4rem 0.6rem;
+  padding: var(--space-2) var(--space-3);
   text-align: left;
 }
 th.col-center, td.col-center {
   text-align: center;
+}
+tbody tr:hover {
+  background: var(--surface-hover);
+}
+thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
 }
 /* Renders the embedded newline in a formatted sync timestamp ("YYYY-MM-DD\nHH:MM:SS UTC") as a
    real two-line break, without a <br> (Jinja2 autoescaping would render one as literal text, not

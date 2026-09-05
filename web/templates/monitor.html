@@ -27,7 +27,7 @@
 <div class="app-shell">
   {% include "_nav.html" %}
   <main>
-  <h1>🖥️ Raw data / schema</h1>
+  <h1>Raw data / schema</h1>
   <p>Every persisted response as a real table -- the same view the legacy Streamlit app's
      <code>st.dataframe(df_display, ...)</code> gave you, one page here for any run. Plus column
      dtypes, for tracing a value's real type back to source. Stage 13: scoped down from the legacy
@@ -38,13 +38,14 @@
   {% if runs %}
   <label>
     Run
-    <select name="run_id" hx-get="/monitor/schema" hx-trigger="change" hx-target="#monitor-schema" hx-swap="outerHTML">
+    <select name="run_id" hx-get="/monitor/schema" hx-trigger="change" hx-target="#monitor-schema" hx-swap="outerHTML" hx-indicator="#run-picker-spinner">
       {% for run in runs %}
       <option value="{{ run.run_id }}" {% if run.run_id == selected_run_id %}selected{% endif %}>
         {{ run.run_id }} ({{ run.started_at }}, {{ run.total_tasks }} tasks)
       </option>
       {% endfor %}
     </select>
+    <span id="run-picker-spinner" class="htmx-indicator spinner" aria-hidden="true"></span>
   </label>
   {% include "_monitor_schema.html" %}
   {% else %}

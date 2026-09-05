@@ -20,10 +20,27 @@ _counter = itertools.count()
 # (clusters, pass/fail) is a separate, not-yet-implemented decision, see
 # docs/source/features.rst.
 _PALETTES = {
-    "dark": {"bg": "#252526", "text": "#d4d4d4", "grid": "#3c3c3c"},
-    "light": {"bg": "#f3f3f3", "text": "#1e1e1e", "grid": "#d4d4d4"},
+    "dark": {"bg": "#16171c", "text": "#e6e6e9", "grid": "#262832"},
+    "light": {"bg": "#f6f7f9", "text": "#1b1d23", "grid": "#dfe1e6"},
 }
 _CHART_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+
+# Qualitative trace/marker palette -- previously every chart fell through to
+# Plotly's own default colorway (bright blue/red/green), which fought the
+# muted VS Code-adjacent chrome instead of sitting in it. Same hue families as
+# style.css's --pass/--fail/--warning/--link tokens, plus two new muted hues
+# (teal, violet) so a chart needing more than 4 series doesn't run out. The
+# --fail-family hue is placed last on purpose -- Plotly assigns colors to
+# traces in the order they're added, so a 2-3-series chart won't accidentally
+# read a mid-series color as "this one = error".
+QUALITATIVE_PALETTE = [
+    "#6f9bd8",  # --link family
+    "#d9a94f",  # --warning family
+    "#4fb8bf",  # new: muted teal
+    "#b98fd1",  # new: muted violet
+    "#6bbf7b",  # --pass family
+    "#d9727a",  # --fail family -- last, deliberately
+]
 
 # Charts are rendered server-side (baked-in colors), but the light/dark theme
 # toggle (web/static/ui.js) is a purely client-side preference with no page
@@ -70,6 +87,7 @@ def figure_to_div(fig: go.Figure) -> str:
         font=dict(color=palette["text"], family=_CHART_FONT),
         legend=dict(bgcolor="rgba(0,0,0,0)"),
         margin=dict(t=50),
+        colorway=QUALITATIVE_PALETTE,
     )
     # update_xaxes/update_yaxes (not update_layout(xaxis=...)) so this reaches every
     # axis on a figure with subplots/facets (e.g. the scatter matrices), not just x1/y1.

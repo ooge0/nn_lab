@@ -33,13 +33,14 @@
   {% if runs %}
   <label>
     Run
-    <select name="run_id" hx-get="/runs/summary" hx-trigger="change" hx-target="#perf-summary" hx-swap="outerHTML">
+    <select name="run_id" hx-get="/runs/summary" hx-trigger="change" hx-target="#perf-summary" hx-swap="outerHTML" hx-indicator="#run-picker-spinner">
       {% for run in runs %}
       <option value="{{ run.run_id }}" {% if run.run_id == selected_run_id %}selected{% endif %}>
         {{ run.run_id }} ({{ run.started_at }}, {{ run.total_tasks }} tasks)
       </option>
       {% endfor %}
     </select>
+    <span id="run-picker-spinner" class="htmx-indicator spinner" aria-hidden="true"></span>
   </label>
   {% include "_perf_summary.html" %}
 
@@ -70,7 +71,7 @@
         {% endfor %}
       </select>
     </label>
-    <button type="submit">Compare</button>
+    <button type="submit" class="btn-secondary">Compare</button>
   </form>
   <div id="judging-comparison"></div>
   {% else %}
