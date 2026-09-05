@@ -1,3 +1,5 @@
+import re
+
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
@@ -8,6 +10,191 @@ from scipy.stats import entropy
 from loguru import logger
 
 from core.service.neo4j_service import Neo4jService
+
+
+# --- Failure-mode/cascade-lineage graph (2026-09-05 addition, same narrow CLAUDE.md SS1
+# exception as the earlier PageRank fix -- see docs/source/wiki/07-knowledge-graph-results.rst).
+# Distinct from the plain Archetype-ASSOCIATED_WITH-Bias co-occurrence graph the original "Sync
+# history to Neo4j" button builds: this models the actual per-response cascade (CLAUDE.md SS3a/SS4)
+# as explicit lineage edges -- which stage each response actually reached, in order -- so failure
+# analysis is a graph traversal, not a groupby. See the module-level Cypher strings below for the
+# schema; the two helpers here only reshape the DataFrame into the row shape that Cypher expects. ---
+
+
+def _parse_rag_chunks(rag_context):
+    """Recovers structured (archetype, category) chunk provenance from the concatenated
+    ``rag_context`` string :meth:`core.services.experiment_runner.ExperimentRunner._run_one`
+    persists -- no separate structured chunk list is stored on the response record, so this parses
+    the exact serialization format that code writes
+    (``f"[{c['archetype']} | {c['category']}]\\n{c['text']}"``, blocks joined by ``"\\n\\n"``).
+    A real, disclosed simplification: this collapses every chunk sharing the same
+    (archetype, category) pair into one graph node, not one node per distinct chunk of text --
+    good enough for "which category of reference material" provenance, not full per-chunk lineage.
+    """
+    if not isinstance(rag_context, str) or not rag_context.strip():
+        return []
+    chunks = []
+    for block in rag_context.split("\n\n"):
+        m = re.match(r"^\[(.+?) \| (.+?)\]\n", block)
+        if m:
+            chunks.append({"archetype": m.group(1), "category": m.group(2)})
+    return chunks
+
+
+def _build_failure_mode_rows(df):
+    """Converts one run's response DataFrame into the row shape :data:`_SYNC_FAILURE_MODE_CYPHER`
+    expects -- in particular, resolves which cascade stages a response actually *reached*.
+
+    A Layer-0-rejected or Layer-1-echo-rejected response never reaches a real judge call (see
+    ``ExperimentRunner._run_one``'s early-return at the Layer-0 check, and the ``echo_detected``
+    branch that synthesizes a verdict without calling ``self._judge.evaluate(...)``) -- attributing
+    that auto-cascade-fail to whichever model happened to be *configured* as judge would misrepresent
+    what actually happened, the same class of naming-vs-meaning gap already found twice elsewhere in
+    this project (``semantic_overlap``, the benchmark leaderboard's ``mimicry_score``). So
+    ``reached_judge`` is computed here, not assumed true just because a ``teacher``/``v_ok`` field
+    exists on every row (it does, even for cascade-auto-fails -- CLAUDE.md SS4's own persisted-field
+    contract).
+    """
+    rows = []
+    for _, r in df.iterrows():
+        layer0 = r.get("layer0_classification")
+        layer0 = layer0 if isinstance(layer0, str) and layer0 else "VALID"
+        reached_layer1 = layer0 == "VALID"
+        echo = bool(r.get("layer1_echo_detected")) if reached_layer1 else False
+        reached_judge = reached_layer1 and not echo
+        layer2_checked = bool(r.get("layer2_checked")) and pd.notna(r.get("layer2_checked"))
+
+        def _num(key):
+            v = r.get(key)
+            return float(v) if pd.notna(v) else None
+
+        rows.append(
+            {
+                "response_id": f"{r.get('run_id')}:{r.get('step')}",
+                "run_id": r.get("run_id"),
+                "archetype": r.get("archetype"),
+                "bias": r.get("bias"),
+                "student": r.get("student"),
+                "teacher": r.get("teacher"),
+                "word_count": _num("word_count"),
+                "duration_ms": _num("duration_ms"),
+                "layer0_classification": layer0,
+                "reached_layer1": reached_layer1,
+                "layer1_result": "ECHO" if echo else "CLEAN",
+                "semantic_overlap": _num("semantic_overlap"),
+                "reached_layer2": layer2_checked,
+                "layer2_result": r.get("layer2_predicted_label") if layer2_checked else None,
+                "layer2_contradiction_score": _num("layer2_contradiction_score"),
+                "reached_judge": reached_judge,
+                "judge_result": "PASS" if bool(r.get("v_ok")) else "FAIL",
+                "v_confidence": _num("v_confidence"),
+                "chunks": _parse_rag_chunks(r.get("rag_context")) if r.get("rag_enabled") else [],
+            }
+        )
+    return rows
+
+
+# Stage 3: a tiny, fixed pipeline-shape reference subgraph (4 nodes, 3 edges, ever) encoding the
+# cascade's own literal stage order -- run once, idempotent (MERGE), so "where does the chain
+# terminate" can be answered by real graph traversal (see _ROOT_CAUSE_TERMINAL_STAGE_CYPHER) instead
+# of an application-side CASE-based rank lookup dressed up as a query.
+_BOOTSTRAP_CASCADE_STAGES_CYPHER = """
+    MERGE (s0:CascadeStage {name:"Layer0"})
+    MERGE (s1:CascadeStage {name:"Layer1"})
+    MERGE (s2:CascadeStage {name:"Layer2"})
+    MERGE (s3:CascadeStage {name:"Judge"})
+    MERGE (s0)-[:PRECEDES]->(s1)
+    MERGE (s1)-[:PRECEDES]->(s2)
+    MERGE (s2)-[:PRECEDES]->(s3)
+"""
+
+# Note: every CascadeStage/CascadeOutcome node is MERGEd as its own bound variable BEFORE any
+# relationship to it is merged -- MERGEing a full (node)-[:REL]->(anonymous pattern) in one step
+# does NOT reuse an existing node for the anonymous side, it silently creates a duplicate (a real
+# Neo4j MERGE pitfall, caught by testing this against the live database before writing it here, not
+# assumed correct from the syntax alone).
+_SYNC_FAILURE_MODE_CYPHER = """
+    UNWIND $rows AS row
+    MERGE (resp:Response {response_id: row.response_id})
+      SET resp.word_count = row.word_count, resp.duration_ms = row.duration_ms
+    MERGE (run:Run {run_id: row.run_id})
+    MERGE (resp)-[:IN_RUN]->(run)
+    MERGE (arch:Archetype {name: row.archetype})
+    MERGE (resp)-[:CONDITIONED_ON]->(arch)
+    MERGE (bias:Bias {name: row.bias})
+    MERGE (resp)-[:CONDITIONED_ON]->(bias)
+    MERGE (student:Model {name: row.student})
+    MERGE (resp)-[:GENERATED_BY]->(student)
+
+    MERGE (l0stage:CascadeStage {name: "Layer0"})
+    MERGE (l0:CascadeOutcome {stage: "Layer0", result: row.layer0_classification})
+    MERGE (l0)-[:PART_OF]->(l0stage)
+    MERGE (resp)-[:REACHED]->(l0)
+
+    FOREACH (_ IN CASE WHEN row.reached_layer1 THEN [1] ELSE [] END |
+      MERGE (l1stage:CascadeStage {name: "Layer1"})
+      MERGE (l1:CascadeOutcome {stage: "Layer1", result: row.layer1_result})
+      MERGE (l1)-[:PART_OF]->(l1stage)
+      MERGE (resp)-[rl1:REACHED]->(l1)
+      SET rl1.score = row.semantic_overlap
+    )
+
+    FOREACH (_ IN CASE WHEN row.reached_layer2 THEN [1] ELSE [] END |
+      MERGE (l2stage:CascadeStage {name: "Layer2"})
+      MERGE (l2:CascadeOutcome {stage: "Layer2", result: row.layer2_result})
+      MERGE (l2)-[:PART_OF]->(l2stage)
+      MERGE (resp)-[rl2:REACHED]->(l2)
+      SET rl2.score = row.layer2_contradiction_score
+    )
+
+    FOREACH (_ IN CASE WHEN row.reached_judge THEN [1] ELSE [] END |
+      MERGE (judge:Model {name: row.teacher})
+      MERGE (resp)-[:JUDGED_BY]->(judge)
+      MERGE (judgeStage:CascadeStage {name: "Judge"})
+      MERGE (jo:CascadeOutcome {stage: "Judge", result: row.judge_result})
+      MERGE (jo)-[:PART_OF]->(judgeStage)
+      MERGE (resp)-[rj:REACHED]->(jo)
+      SET rj.confidence = row.v_confidence
+    )
+
+    FOREACH (chunk IN row.chunks |
+      MERGE (kc:KnowledgeChunk {archetype: chunk.archetype, category: chunk.category})
+      MERGE (resp)-[:RETRIEVED]->(kc)
+    )
+"""
+
+# Root-cause query 1: which model is disproportionately linked to echo-rejections, across every
+# archetype/bias it was tried against -- a real multi-hop pattern match, not a pandas groupby,
+# because it composes for free with any other relationship on Response (archetype, bias, run, ...).
+_ROOT_CAUSE_ECHO_BY_MODEL_CYPHER = """
+    MATCH (r:Response)-[:GENERATED_BY]->(m:Model),
+          (r)-[:REACHED]->(:CascadeOutcome {stage:"Layer1", result:"ECHO"})
+    RETURN m.name AS model, count(r) AS echo_count
+    ORDER BY echo_count DESC
+"""
+
+# Root-cause query 2: for one archetype, where does the cascade chain actually terminate -- using
+# the Stage-3 pipeline-shape subgraph (CascadeStage/PRECEDES) via a real EXISTS{} graph traversal,
+# not an application-side stage-rank lookup. A response with no *later*-stage REACHED outcome is,
+# by construction, terminal at the outcome this query returns.
+_ROOT_CAUSE_TERMINAL_STAGE_CYPHER = """
+    MATCH (a:Archetype {name:$archetype})<-[:CONDITIONED_ON]-(r:Response)
+    MATCH (r)-[:REACHED]->(o:CascadeOutcome)-[:PART_OF]->(s:CascadeStage)
+    WHERE NOT EXISTS {
+      MATCH (s)-[:PRECEDES]->(:CascadeStage)<-[:PART_OF]-(o2:CascadeOutcome)<-[:REACHED]-(r)
+    }
+    RETURN o.stage AS terminal_stage, o.result AS terminal_result, count(r) AS n
+    ORDER BY n DESC
+"""
+
+# Root-cause query 3: which RAG-retrieved knowledge categories are upstream of Layer-1 echo
+# failures -- the first query in this codebase connecting the RAG subsystem and the knowledge graph
+# at all; previously the two never referenced each other.
+_ROOT_CAUSE_RAG_CHUNKS_BY_ECHO_CYPHER = """
+    MATCH (c:KnowledgeChunk)<-[:RETRIEVED]-(r:Response)-[:REACHED]->(:CascadeOutcome {stage:"Layer1", result:"ECHO"})
+    RETURN c.archetype AS chunk_archetype, c.category AS chunk_category, count(r) AS echo_count
+    ORDER BY echo_count DESC
+"""
 
 
 class KnowledgeGraph:
@@ -46,6 +233,10 @@ class KnowledgeGraph:
         - Pushes DataFrame rows into Neo4j (Archetype → Bias relationships).
         - Provides buttons to run PageRank scripts.
         - Displays results in interactive charts and tables.
+        - "Root Cause (Failure-Mode Graph)" (2026-09-05): a second, richer sync builds an explicit
+          per-response cascade-lineage graph (Response -> Run/Archetype/Bias/Model, plus which
+          Layer0/Layer1/Layer2/Judge outcome each response actually reached) and exposes three
+          real root-cause queries over it -- see docs/source/wiki/07-knowledge-graph-results.rst.
 
     Implementation status -- read before assuming this is stale
     --------------------------------------------------------------
@@ -96,8 +287,9 @@ class KnowledgeGraph:
         neo4j_service = Neo4jService()
         graph = neo4j_service.load_neo4j_creds()
         st.subheader("Knowledge Graph")
-        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-            "PageRank-1", "PageRank-2", "PageRank-3", "PageRank-4", "Hypothesis Testing", "Uncertainty Analysis"
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+            "PageRank-1", "PageRank-2", "PageRank-3", "PageRank-4", "Hypothesis Testing",
+            "Uncertainty Analysis", "Root Cause (Failure-Mode Graph)",
         ])
 
         # Push DataFrame rows into Neo4j (batched for speed)
@@ -236,6 +428,27 @@ class KnowledgeGraph:
             st.header("PageRank script-4")
             if st.button("Run PageRank script-4"):
                 try:
+                    # Real bug found during a 2026-09-05 audit: this previously called
+                    # gds.pageRank.stream('experimentGraph') unconditionally, assuming
+                    # script-3's projection had already run in this session -- if it
+                    # hadn't (e.g. this tab clicked first, or after a server restart,
+                    # since GDS's in-memory graph catalog does not persist across
+                    # restarts), this raised the same
+                    # Procedure.ProcedureNotFound/graph-not-found class of error
+                    # script-3's own TODO already disclosed for 'archetypeGraph'.
+                    # Same exists-check-then-project guard as scripts 1/3.
+                    exists = graph.run("CALL gds.graph.exists('experimentGraph') YIELD exists").evaluate()
+                    if not exists:
+                        graph.run("""
+                            CALL gds.graph.project(
+                              'experimentGraph',
+                              ['Archetype','Bias'],
+                              {
+                                ASSOCIATED_WITH: { type:'ASSOCIATED_WITH', orientation:'UNDIRECTED' }
+                              }
+                            )
+                        """)
+
                     result = graph.run("""
                         CALL gds.pageRank.stream('experimentGraph')
                         YIELD nodeId, score
@@ -394,3 +607,53 @@ class KnowledgeGraph:
                         ax.set_title(f"Distribution comparison for {metric}")
                         ax.legend()
                         st.pyplot(fig)
+
+        with tab7:
+            st.header("Root cause: cascade failure-mode graph")
+            st.caption(
+                "Models the actual per-response cascade (CLAUDE.md SS3a/SS4) as explicit lineage "
+                "edges -- which stage each response reached, in order -- distinct from the plain "
+                "Archetype-Bias co-occurrence graph the 'Sync history to Neo4j' button above builds. "
+                "See docs/source/wiki/07-knowledge-graph-results.rst for the full schema and rationale."
+            )
+
+            if st.button("Sync failure-mode graph"):
+                try:
+                    graph.run(_BOOTSTRAP_CASCADE_STAGES_CYPHER)
+                    rows = _build_failure_mode_rows(df)
+                    graph.run(_SYNC_FAILURE_MODE_CYPHER, rows=rows)
+                    st.success(f"Failure-mode graph synced! {len(rows)} response(s) processed.")
+                except Exception as e:
+                    st.error(f"Error syncing failure-mode graph: {e}")
+                    logger.error(f"Error syncing failure-mode graph: {e}")
+
+            st.subheader("Root-cause queries")
+
+            if st.button("Which model is most linked to echo-rejections?"):
+                try:
+                    result = graph.run(_ROOT_CAUSE_ECHO_BY_MODEL_CYPHER).to_data_frame()
+                    st.dataframe(result)
+                except Exception as e:
+                    st.error(f"Error running query: {e}")
+
+            rc_archetype = st.selectbox(
+                "Archetype to inspect", df["archetype"].unique(), key="root_cause_archetype"
+            )
+            if st.button("Where does the cascade terminate for this archetype?"):
+                try:
+                    result = graph.run(
+                        _ROOT_CAUSE_TERMINAL_STAGE_CYPHER, archetype=rc_archetype
+                    ).to_data_frame()
+                    st.dataframe(result)
+                except Exception as e:
+                    st.error(f"Error running query: {e}")
+
+            if st.button("Which RAG knowledge categories precede echo-rejections?"):
+                try:
+                    result = graph.run(_ROOT_CAUSE_RAG_CHUNKS_BY_ECHO_CYPHER).to_data_frame()
+                    if result.empty:
+                        st.info("No RAG-enabled responses with echo-rejections found in this run's synced data.")
+                    else:
+                        st.dataframe(result)
+                except Exception as e:
+                    st.error(f"Error running query: {e}")

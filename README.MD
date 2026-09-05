@@ -337,7 +337,24 @@ cd neo4j-community-*/bin
 ```
 Then open http://localhost:7474, log in with `neo4j`/`neo4j`, and set a new password.
 
-**2. Configure Neo4j credentials** — edit the `[neo4j]` section of `config/config.ini` (already
+**2. Install and enable the Graph Data Science (GDS) plugin** — required for the PageRank tabs
+(`gds.graph.project`/`gds.pageRank.stream`); **a real, previously-shipped bug in this exact setup
+guide** (found and fixed 2026-09-05, see `docs/source/wiki/07-knowledge-graph-results.rst` for the
+full story) was that this step was missing entirely — the plugin being merely *installed* is not
+enough, Neo4j's own procedure sandboxing blocks it unless explicitly unrestricted/allowlisted:
+1. Download the GDS plugin jar matching your Neo4j version and drop it into `<neo4j-home>/plugins/`
+   (Neo4j Desktop/Server distributions often ship it there already under `plugins/` or `labs/` —
+   check before re-downloading).
+2. Edit `<neo4j-home>/conf/neo4j.conf` and set (create the lines if they don't already exist):
+   ```
+   dbms.security.procedures.unrestricted=gds.*
+   dbms.security.procedures.allowlist=apoc.*,gds.*
+   ```
+   (if you're also relying on APOC elsewhere, keep `apoc.*` in both lists alongside `gds.*` rather
+   than replacing it).
+3. Restart Neo4j for the config change to take effect.
+
+**3. Configure Neo4j credentials** — edit the `[neo4j]` section of `config/config.ini` (already
 created in **Installation & Setup**, step 6 above; not committed to source control):
 ```ini
 [neo4j]
@@ -346,14 +363,19 @@ user = neo4j
 password = your_password_here
 ```
 
-**3. Verify connectivity** — either via the Neo4j web console (`CALL apoc.help('pageRank');`), or:
+**4. Verify connectivity, including GDS** — a bare connectivity check (or `CALL apoc.help('pageRank')`)
+only proves Neo4j itself is reachable, not that GDS is actually registered — confirm both:
 ```python
 from py2neo import Graph
 graph = Graph("bolt://localhost:7687", auth=("neo4j", "your_password_here"))
-print(graph.run("RETURN 1 AS test").data())   # expect [{'test': 1}]
+print(graph.run("RETURN 1 AS test").data())        # expect [{'test': 1}]
+print(graph.run("RETURN gds.version() AS v").data())  # expect a real version string, not an error
 ```
+If the second line raises `Procedure.ProcedureNotFound`, step 2 above wasn't applied (or Neo4j
+wasn't restarted after editing `neo4j.conf`) — this is the exact failure mode this section now
+exists to prevent.
 
-**4. Troubleshooting** — if the app reports `ConnectionUnavailable: Cannot open connection to
+**5. Troubleshooting** — if the app reports `ConnectionUnavailable: Cannot open connection to
 bolt://localhost:7687`, verify Neo4j is actually listening:
 ```powershell
 netstat -ano | findstr 7687   # Windows -- expect LISTEN

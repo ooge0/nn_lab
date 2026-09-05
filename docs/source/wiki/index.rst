@@ -24,6 +24,7 @@ Read in order -- each page assumes the ones before it:
    04-llm-analytics
    05-cicd
    06-qa-testing-strategy
+   07-knowledge-graph-results
 
 0. :doc:`00-getting-started` -- environment setup from scratch, running every front end, service
    manipulations, tests, reports, and a manual verification checklist.
@@ -40,3 +41,8 @@ Read in order -- each page assumes the ones before it:
    shaped specifically around this repository's own constraints.
 6. :doc:`06-qa-testing-strategy` -- testing approaches actually used and why, distinct from
    :doc:`../qa`'s generated roster: this page is the rationale, that page is the evidence.
+7. :doc:`07-knowledge-graph-results` -- a real, disclosed bug in the quarantined Neo4j/GDS
+   subsystem, found and fixed under a narrow, explicit exception to CLAUDE.md SS1, with real
+   captured proof (screenshots, real PageRank output data) that it now genuinely works -- plus a
+   follow-up failure-mode/cascade-lineage graph with real root-cause query results over a real
+   500-response run.

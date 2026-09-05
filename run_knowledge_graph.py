@@ -57,4 +57,9 @@ else:
 
     responses = repository.load_responses(selected_run_id)
     df = pd.json_normalize(responses)
+    # Response records don't carry their own run_id (JSONLStore keys runs by filename, not by a
+    # field on each row) -- the 2026-09-05 failure-mode-graph addition needs it (for the Response
+    # node's response_id and the :IN_RUN relationship), so it's added here, at the one place that
+    # already knows which run was selected, rather than threading it through JSONLStore itself.
+    df["run_id"] = selected_run_id
     KnowledgeGraph.knowledge_graph_tab(df)

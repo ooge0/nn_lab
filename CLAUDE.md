@@ -50,6 +50,48 @@ Optimize accordingly: correctness of the core over breadth of features.
   `run_knowledge_graph.py`, precisely so a future reader doesn't mistake settled, deliberate scope
   for an oversight. If a change would alter what the code *does* — not just what it *says* — the
   "do not build on it or extend it" rule above still applies without exception.
+
+  **Second standing exception, 2026-09-05, explicit and narrow (same precedent as SS4/SS6's judge
+  fix):** a resume-claims audit found a real, author-disclosed bug — 3 of 4 PageRank scripts in
+  `KnowledgeGraph.knowledge_graph_tab` failed with `Procedure.ProcedureNotFound` against this
+  project's own documented Neo4j setup (the GDS plugin was installed but never unrestricted/
+  allowlisted in `neo4j.conf` — a config gap, not a missing dependency) — plus zero test coverage.
+  Author asked for a real, working fix with technical proof, not just a diagnosis. Fixed: the
+  `neo4j.conf` procedure-security config (outside this repo, on the local Neo4j install — not a
+  code change), and one real code bug in `core/tabs/knowledge_graph.py` (script-4 called
+  `gds.pageRank.stream` with no exists-check/projection guard, unlike scripts 1/3 — now matches
+  their pattern). Added `tests/unit/test_knowledge_graph.py` (4 tests, mocked `py2neo.Graph`, no
+  live server — this project has no Docker/disposable-test-database story, so this checks
+  query-construction/ordering, not that a real Neo4j+GDS deployment works). Real end-to-end proof
+  captured by driving the actual `run_knowledge_graph.py` Streamlit app via Playwright against real
+  run data (sync + all 4 PageRank scripts, screenshots + real PageRank output saved) — see
+  `docs/source/wiki/07-knowledge-graph-results.rst` for the full record, root cause, and honest
+  limitations (GDS's graph catalog doesn't survive a Neo4j restart; tabs 5/6 never touch Neo4j at
+  all — pure pandas/scipy on the in-memory DataFrame). Explicitly **not** done: no refactor, no
+  move behind a `core.domain` interface, no promotion into the rewrite's own testing/architecture
+  discipline — the subsystem now demonstrably works and has some real coverage, but stays exactly
+  where CLAUDE.md SS1 already puts it.
+
+  **Same exception, extended same day:** a follow-up request asked for the most useful real
+  scenario for this subsystem, grounded in real data-lineage/AIOps root-cause practice (researched,
+  not invented — see the wiki page's sources). Added a second, additive sync building a
+  failure-mode/cascade-lineage graph (`Response` → which `Layer0`/`Layer1`/`Layer2`/`Judge` outcome
+  it actually reached, `Model`/`Archetype`/`Bias`/`Run` context, RAG-chunk provenance recovered from
+  the persisted `rag_context` string) plus 3 real root-cause Cypher queries, exposed as a new
+  "Root Cause (Failure-Mode Graph)" tab — does not touch or replace the original Archetype/Bias/
+  PageRank graph. Two real things found and fixed before this shipped, not assumed correct: a
+  classic Neo4j `MERGE`-on-anonymous-node pitfall that silently duplicated `CascadeStage` reference
+  nodes (caught by a synthetic smoke test against the live database before writing it into the app),
+  and a real pipeline-semantics subtlety (Layer 2's hallucination check runs unconditionally on echo
+  status, so an echo-rejected response can still show `layer2_checked=True` — `reached_judge` is
+  computed explicitly as `layer0==VALID and not echo`, never inferred from "reached a later stage").
+  7 new tests (11 total for this module). Real proof captured the same way as the PageRank fix —
+  driving the actual Streamlit app via Playwright against a real 500-response, RAG-enabled run —
+  with genuinely actionable findings (e.g. one student model echoing its own bias instruction back
+  more than 2x as often as another; one RAG knowledge category linked to 36 of the run's echo
+  failures). Full record: `docs/source/wiki/07-knowledge-graph-results.rst`. Same explicit
+  boundaries as before: no refactor into `core.domain`, no promotion into the rewrite's own
+  architecture/testing discipline.
 - Authentication.
 - Hosted inference migration (stay on local Ollama for now).
 - Any product/marketing/"client-facing metrics" layer.
