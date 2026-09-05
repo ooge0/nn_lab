@@ -25,6 +25,7 @@ Read in order -- each page assumes the ones before it:
    05-cicd
    06-qa-testing-strategy
    07-knowledge-graph-results
+   08-graph-representation-learning
 
 0. :doc:`00-getting-started` -- environment setup from scratch, running every front end, service
    manipulations, tests, reports, and a manual verification checklist.
@@ -46,3 +47,8 @@ Read in order -- each page assumes the ones before it:
    captured proof (screenshots, real PageRank output data) that it now genuinely works -- plus a
    follow-up failure-mode/cascade-lineage graph with real root-cause query results over a real
    500-response run.
+8. :doc:`08-graph-representation-learning` -- a design document (not yet built) for the next layer
+   up: using the failure-mode graph's own structure -- node embeddings, community detection,
+   anomaly/analogy detection, link prediction -- to surface patterns nobody wrote a query for,
+   grounded in five real, cited academic sources rather than invented, with every GDS procedure
+   named confirmed available on the actual live install.
